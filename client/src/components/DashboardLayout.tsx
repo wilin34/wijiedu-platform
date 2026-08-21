@@ -29,12 +29,21 @@ export default function DashboardLayout({
   pageTitle,
   roleLabel,
 }: DashboardLayoutProps) {
-  const { loading, user, logout } = useAuth();
+  const { loading, user, logout, error } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   if (loading) {
-    return <div className="min-h-screen bg-[#0A1628]" />;
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#0A1628] px-5 text-[#E2E8F0]">
+        <section className="w-full max-w-md rounded-[20px] border border-[#243356] bg-[#111E35] p-8 text-center shadow-2xl">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-[#4F8EF7]/30 border-t-[#4F8EF7]" />
+          <h1 className="font-display text-xl font-bold text-white">Preparando tu acceso</h1>
+          <p className="mt-2 text-sm leading-6 text-[#8898AA]">Si la carga tarda demasiado, puedes comenzar el registro de nuevo.</p>
+          <Button onClick={() => startLogin()} className="mt-6 w-full bg-[#4F8EF7] py-5 font-semibold hover:bg-[#3A7AE8]">Registrarme ahora</Button>
+        </section>
+      </main>
+    );
   }
 
   if (!user) {
@@ -46,8 +55,10 @@ export default function DashboardLayout({
             <h1 className="font-display text-3xl font-extrabold text-white">WijiEdu</h1>
             <p className="mt-1 text-sm text-[#8898AA]">Plataforma Educativa Profesional</p>
           </div>
-          <p className="mb-6 text-center text-sm leading-6 text-[#B8C4D6]">Inicia sesión con Manus para acceder de forma segura a tu espacio académico.</p>
-          <Button onClick={() => startLogin()} className="w-full bg-[#4F8EF7] py-5 font-semibold hover:bg-[#3A7AE8]">Iniciar sesión con Manus</Button>
+          <p className="mb-6 text-center text-sm leading-6 text-[#B8C4D6]">Crea tu cuenta para acceder a materias, calificaciones y actividades en un solo lugar.</p>
+          {error && <p className="mb-4 rounded-xl border border-[#F59E0B]/25 bg-[#F59E0B]/10 px-3 py-2 text-center text-xs leading-5 text-[#F8C45E]">La sesión anterior ya no es válida. Regístrate o accede de nuevo para continuar.</p>}
+          <Button onClick={() => startLogin()} className="w-full bg-[#4F8EF7] py-5 font-semibold hover:bg-[#3A7AE8]">Regístrate gratis</Button>
+          <button onClick={() => startLogin()} className="mt-4 w-full text-sm font-semibold text-[#75A7FF] transition hover:text-white">¿Ya tienes una cuenta? Acceder</button>
         </section>
       </main>
     );

@@ -1,5 +1,7 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
+import { COOKIE_NAME } from "../../shared/const";
 import type { User } from "../../drizzle/schema";
+import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
 export type TrpcContext = {
@@ -16,7 +18,11 @@ export async function createContext(
   try {
     user = await sdk.authenticateRequest(opts.req);
   } catch (error) {
-    // Authentication is optional for public procedures.
+    // Remove an invalid browser session so the public access screen can recover.
+    opts.res.clearCookie(COOKIE_NAME, {
+      ...getSessionCookieOptions(opts.req),
+      maxAge: -1,
+    });
     user = null;
   }
 

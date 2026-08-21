@@ -13,3 +13,14 @@
 - [x] Verificar el diseño en pantallas de escritorio y móviles.
 - [x] Añadir interfaz para consultar y retirar inscripciones de estudiantes por materia.
 - [x] Añadir pruebas de los routers académicos y sus restricciones de autorización.
+- [x] Corregir el bloqueo de acceso detectado en la sesión de WijiEdu.
+- [x] Sustituir el texto de acceso “Iniciar sesión con Manus” por una experiencia de registro clara y orientada a nuevos usuarios.
+- [x] Verificar el flujo de registro y acceso en la vista pública.
+- [x] Probar la recuperación de la vista pública cuando exista una sesión vencida o inválida.
+- [x] Verificar que los controles de registro y acceso inicien el flujo seguro esperado.
+- [x] Añadir cobertura de la limpieza de sesión local ante respuestas de autenticación inválidas.
+- [x] Verificar mediante una ruta pública que la pantalla de registro se muestre de forma recuperable.
+- [x] Añadir una prueba del redireccionamiento seguro iniciado desde el registro.
+- [x] Añadir una prueba de la ruta pública de registro cuando la autenticación no está disponible.
+- [x] Añadir una prueba de enrutamiento que confirme el acceso a /registro sin sesión válida.
+- [x] Simular una sesión local inválida al comprobar la disponibilidad de /registro.
