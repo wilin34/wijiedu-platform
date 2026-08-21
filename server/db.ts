@@ -60,6 +60,40 @@ export async function getUserByOpenId(openId: string) {
   return result[0];
 }
 
+export async function getUserById(userId: number) {
+  const db = await requireDb();
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return result[0];
+}
+
+export async function getUserByEmail(email: string) {
+  const db = await requireDb();
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  return result[0];
+}
+
+export async function createLocalUser(input: { name: string; email: string; passwordHash: string }) {
+  const db = await requireDb();
+  const openId = `local_${crypto.randomUUID().replace(/-/g, "")}`;
+  const result = await db.insert(users).values({
+    openId,
+    name: input.name,
+    email: input.email,
+    loginMethod: "local",
+    passwordHash: input.passwordHash,
+    role: "student",
+    lastSignedIn: new Date(),
+  });
+  const userId = Number(result[0].insertId);
+  await db.insert(students).values({ userId, fullName: input.name, email: input.email, status: "active" });
+  return getUserById(userId);
+}
+
+export async function updateLastSignedIn(userId: number) {
+  const db = await requireDb();
+  await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, userId));
+}
+
 export async function listUsers() {
   const db = await requireDb();
   return db.select().from(users).orderBy(desc(users.createdAt));

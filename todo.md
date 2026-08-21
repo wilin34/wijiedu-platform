@@ -24,3 +24,6 @@
 - [x] Añadir una prueba de la ruta pública de registro cuando la autenticación no está disponible.
 - [x] Añadir una prueba de enrutamiento que confirme el acceso a /registro sin sesión válida.
 - [x] Simular una sesión local inválida al comprobar la disponibilidad de /registro.
+- [x] Reproducir el bloqueo persistente de acceso informado por el usuario.
+- [x] Eliminar el estado de espera indefinida y habilitar una entrada funcional desde la pantalla inicial.
+- [x] Verificar un flujo de acceso completo desde una sesión sin credenciales válidas.

@@ -21,7 +21,7 @@ describe("createContext", () => {
     expect(ctx.user).toBeNull();
     expect(clearCookie).toHaveBeenCalledWith(
       expect.any(String),
-      expect.objectContaining({ maxAge: -1, path: "/", secure: true })
+      expect.objectContaining({ path: "/", secure: true })
     );
   });
 });

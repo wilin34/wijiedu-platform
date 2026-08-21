@@ -15,6 +15,20 @@
       "when": 1787343390479,
       "tag": "0001_unusual_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787345315017,
+      "tag": "0002_dry_banshee",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1787345366185,
+      "tag": "0003_loving_maximus",
+      "breakpoints": true
     }
   ]
 }

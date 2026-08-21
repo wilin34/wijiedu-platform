@@ -5,6 +5,14 @@ import { Route, Router, Switch } from "wouter";
 import Register from "./Register";
 
 vi.mock("@/const", () => ({ startLogin: vi.fn() }));
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    localAuth: {
+      register: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) },
+      login: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) },
+    },
+  },
+}));
 
 const originalSessionStorage = globalThis.sessionStorage;
 
@@ -16,8 +24,8 @@ describe("ruta pública de registro", () => {
   it("se renderiza sin depender de una sesión académica válida", () => {
     const markup = renderToStaticMarkup(createElement(Register));
 
-    expect(markup).toContain("Regístrate gratis");
-    expect(markup).toContain("¿Ya tienes una cuenta? Acceder");
+    expect(markup).toContain("Crear mi cuenta");
+    expect(markup).toContain("Entrar");
     expect(markup).toContain("WijiEdu");
   });
 
@@ -31,7 +39,7 @@ describe("ruta pública de registro", () => {
       )
     );
 
-    expect(markup).toContain("Regístrate gratis");
+    expect(markup).toContain("Crear mi cuenta");
   });
 
   it("permanece disponible en /registro cuando existe una sesión local inválida", () => {
