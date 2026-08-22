@@ -43,6 +43,13 @@
       "when": 1787413656697,
       "tag": "0005_skinny_oracle",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787416217302,
+      "tag": "0006_spooky_lester",
+      "breakpoints": true
     }
   ]
 }

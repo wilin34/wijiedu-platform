@@ -84,6 +84,31 @@ export const competencies = mysqlTable("competencies", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const courseModules = mysqlTable("course_modules", {
+  id: int("id").autoincrement().primaryKey(),
+  subjectId: int("subjectId").notNull(),
+  title: varchar("title", { length: 220 }).notNull(),
+  overview: text("overview").notNull(),
+  learningObjectives: text("learningObjectives").notNull(),
+  estimatedHours: int("estimatedHours").default(2).notNull(),
+  imageUrl: varchar("imageUrl", { length: 1024 }),
+  imagePrompt: text("imagePrompt"),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const courseLessons = mysqlTable("course_lessons", {
+  id: int("id").autoincrement().primaryKey(),
+  moduleId: int("moduleId").notNull(),
+  title: varchar("title", { length: 220 }).notNull(),
+  summary: text("summary").notNull(),
+  explanation: text("explanation").notNull(),
+  keyTopics: text("keyTopics").notNull(),
+  classActivity: text("classActivity"),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const enrollments = mysqlTable(
   "enrollments",
   {
@@ -186,5 +211,7 @@ export type Activity = typeof activities.$inferSelect;
 export type Grade = typeof grades.$inferSelect;
 export type CourseResource = typeof courseResources.$inferSelect;
 export type Competency = typeof competencies.$inferSelect;
+export type CourseModule = typeof courseModules.$inferSelect;
+export type CourseLesson = typeof courseLessons.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type LiveClass = typeof liveClasses.$inferSelect;

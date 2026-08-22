@@ -5,6 +5,7 @@ import { z } from "zod";
 import * as db from "../db";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
+import { generateImage } from "../_core/imageGeneration";
 import { protectedProcedure, router } from "../_core/trpc";
 
 type AppUser = { id: number; role: string; email?: string | null };
@@ -21,13 +22,24 @@ function fallbackCourseProposal(input: { topic: string; level: "basic" | "interm
     name: input.topic,
     description: `Propuesta curricular de ${input.topic} para el período ${input.period}.`,
     resources: [
-      { title: `Guía introductoria de ${input.topic}`, description: "Material de lectura para orientar el aprendizaje.", resourceType: "reading", url: null },
-      { title: "Actividad práctica guiada", description: "Recurso para aplicar los conceptos principales.", resourceType: "document", url: null },
+      { title: `Guía introductoria de ${input.topic}`, description: "Material de lectura para orientar el aprendizaje.", resourceType: "reading" as const, url: null },
+      { title: "Actividad práctica guiada", description: "Recurso para aplicar los conceptos principales.", resourceType: "document" as const, url: null },
     ],
     competencies: [
-      { title: `Comprender fundamentos de ${input.topic}`, description: "Reconoce conceptos, vocabulario y aplicaciones esenciales.", level: "basic" },
-      { title: `Aplicar conocimientos de ${input.topic}`, description: "Resuelve situaciones prácticas y argumenta decisiones.", level: input.level },
+      { title: `Comprender fundamentos de ${input.topic}`, description: "Reconoce conceptos, vocabulario y aplicaciones esenciales.", level: "basic" as const },
+      { title: `Aplicar conocimientos de ${input.topic}`, description: "Resuelve situaciones prácticas y argumenta decisiones.", level: input.level as "basic" | "intermediate" | "advanced" },
     ],
+    modules: ["Fundamentos", "Aplicación", "Proyecto integrador"].map((phase, index) => ({
+      title: `Módulo ${index + 1} · ${phase} de ${input.topic}`,
+      overview: `Este módulo desarrolla ${phase.toLowerCase()} de ${input.topic} mediante explicaciones, ejemplos, análisis guiado y una actividad de clase.`,
+      learningObjectives: ["Reconocer conceptos esenciales", "Aplicar lo aprendido en una situación académica"],
+      estimatedHours: index === 1 ? 4 : 3,
+      imagePrompt: `Ilustración editorial educativa sobre ${phase.toLowerCase()} de ${input.topic}, entorno académico contemporáneo, paleta carbón, piedra y dorado, sin texto`,
+      lessons: [
+        { title: `Conceptos de ${phase.toLowerCase()}`, summary: `Presentación clara de los conceptos y procedimientos que componen ${phase.toLowerCase()} de ${input.topic}.`, explanation: `La clase propone una explicación paso a paso que conecta los conceptos con casos cercanos. El docente modela cómo usar el vocabulario del área, formula preguntas de análisis y acompaña a los estudiantes para que relacionen la teoría con decisiones y situaciones concretas.`, keyTopics: ["Conceptos centrales", "Vocabulario académico", "Ejemplos aplicados"], classActivity: "Discusión guiada con un caso breve y registro de ideas principales." },
+        { title: `Taller de ${phase.toLowerCase()}`, summary: "Aplicación guiada de los contenidos mediante una actividad práctica y colaborativa.", explanation: `Los estudiantes organizan la información disponible, seleccionan una estrategia de resolución y argumentan su propuesta. La actividad permite identificar avances, dudas y oportunidades de mejora antes de continuar con el siguiente módulo.`, keyTopics: ["Análisis de casos", "Resolución de problemas", "Argumentación"], classActivity: "Taller por equipos con socialización de resultados y retroalimentación." },
+      ],
+    })),
   };
 }
 
@@ -89,6 +101,50 @@ const competencyInput = z.object({
   description: z.string().trim().max(5000).nullable().optional(),
   level: z.enum(["basic", "intermediate", "advanced"]),
 });
+
+const courseModuleInput = z.object({
+  title: z.string().trim().min(3).max(220),
+  overview: z.string().trim().min(30).max(5000),
+  learningObjectives: z.array(z.string().trim().min(3).max(500)).min(2).max(5),
+  estimatedHours: z.number().int().min(1).max(24),
+  imagePrompt: z.string().trim().min(10).max(1000),
+  lessons: z.array(z.object({
+    title: z.string().trim().min(3).max(220),
+    summary: z.string().trim().min(20).max(1500),
+    explanation: z.string().trim().min(80).max(5000),
+    keyTopics: z.array(z.string().trim().min(2).max(250)).min(3).max(6),
+    classActivity: z.string().trim().min(10).max(1500).nullable().optional(),
+  })).min(2).max(4),
+});
+
+const generatedCourseInput = z.object({ topic: z.string().trim().min(3).max(180), level: z.enum(["basic", "intermediate", "advanced"]), period: z.string().trim().min(2).max(60) });
+const detailedCourseProposal = z.object({
+  code: z.string().trim().min(2).max(32),
+  name: z.string().trim().min(3).max(180),
+  description: z.string().trim().min(30).max(5000),
+  resources: z.array(resourceInput).min(2).max(4),
+  competencies: z.array(competencyInput).min(2).max(5),
+  modules: z.array(courseModuleInput).min(3).max(3),
+});
+
+async function generateDetailedCourseProposal(input: z.infer<typeof generatedCourseInput>) {
+  const response = await invokeLLM({
+    model: "claude-haiku-4-5",
+    maxTokens: 6000,
+    messages: [
+      { role: "system", content: "Eres un diseñador curricular experto. Responde únicamente JSON válido, en español, sin Markdown y sin enlaces inventados." },
+      { role: "user", content: `Diseña una materia completa sobre ${input.topic}, nivel ${input.level}, período ${input.period}. Incluye code, name, description, resources (2 a 4, con title, description, resourceType y url null si no hay una URL verificable), competencies (2 a 5 con title, description y level), y exactamente 3 modules. Cada módulo debe incluir title, overview muy claro, 2 a 5 learningObjectives, estimatedHours, imagePrompt en español para una ilustración educativa sin texto, y 2 a 4 lessons. Cada lección requiere title, summary, explanation didáctica detallada de mínimo 80 caracteres, 3 a 6 keyTopics y classActivity. Mantén una progresión: fundamentos, aplicación y proyecto integrador.` },
+    ],
+  });
+  const content = response.choices?.[0]?.message.content;
+  if (typeof content !== "string") return fallbackCourseProposal(input);
+  try {
+    const parsed = detailedCourseProposal.safeParse(JSON.parse(content));
+    return parsed.success ? parsed.data : fallbackCourseProposal(input);
+  } catch {
+    return fallbackCourseProposal(input);
+  }
+}
 
 const subjectCreateInput = subjectInput.extend({
   resources: z.array(resourceInput).default([]),
@@ -304,6 +360,10 @@ export const academicRouter = router({
       if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, input.subjectId))) forbid("No tienes acceso a las competencias de esta materia.");
       return db.listCompetencies(input.subjectId);
     }),
+    modules: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, input.subjectId))) forbid("No tienes acceso al programa de esta materia.");
+      return db.listCourseModulesForSubject(input.subjectId);
+    }),
     addResource: protectedProcedure.input(z.object({ subjectId: z.number().int().positive(), data: resourceInput })).mutation(async ({ ctx, input }) => {
       await assertSubjectManager(ctx.user, input.subjectId);
       return { id: await db.createCourseResource({ ...input.data, subjectId: input.subjectId, createdBy: ctx.user.id }) };
@@ -335,19 +395,24 @@ export const academicRouter = router({
     }),
   }),
   ai: router({
-    generateCourse: protectedProcedure.input(z.object({ topic: z.string().trim().min(3).max(180), level: z.enum(["basic", "intermediate", "advanced"]), period: z.string().trim().min(2).max(60) })).mutation(async ({ ctx, input }) => {
+    generateCourse: protectedProcedure.input(generatedCourseInput).mutation(async ({ ctx, input }) => {
       if (!isStaff(ctx.user)) forbid("Solo el personal académico puede generar propuestas de curso.");
-      const response = await invokeLLM({
-        model: "claude-haiku-4-5",
-        maxTokens: 1800,
-        messages: [
-          { role: "system", content: "Eres diseñador curricular. Responde únicamente JSON válido y en español." },
-          { role: "user", content: `Diseña una propuesta de curso sobre ${input.topic} para nivel ${input.level} y período ${input.period}. Devuelve JSON con code, name, description, resources (máximo 4 objetos con title, description, resourceType: link/document/video/reading, url opcional) y competencies (máximo 4 objetos con title, description, level: basic/intermediate/advanced). No inventes enlaces externos: usa null para url cuando no haya un enlace verificable.` },
-        ],
-      });
-      const content = response.choices?.[0]?.message.content;
-      if (typeof content !== "string") return fallbackCourseProposal(input);
-      try { return JSON.parse(content); } catch { return fallbackCourseProposal(input); }
+      return generateDetailedCourseProposal(input);
+    }),
+    createGeneratedCourse: protectedProcedure.input(generatedCourseInput).mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx.user);
+      const proposal = await generateDetailedCourseProposal(input);
+      const modules = await Promise.all(proposal.modules.map(async courseModule => {
+        try {
+          const image = await generateImage({ prompt: `${courseModule.imagePrompt}. Ilustración horizontal para una plataforma educativa institucional, composición limpia, no incluir palabras, letras, números ni marcas.` });
+          return { ...courseModule, imageUrl: image.url };
+        } catch (error) {
+          console.warn("[Curriculum] No fue posible generar la ilustración del módulo:", error);
+          return { ...courseModule, imageUrl: null };
+        }
+      }));
+      const id = await db.createSubjectWithCurriculum({ ...proposal, modules, period: input.period, color: "#B69A5E", createdBy: ctx.user.id });
+      return { id, proposal: { ...proposal, modules } };
     }),
   }),
 });

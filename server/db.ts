@@ -3,6 +3,8 @@ import { drizzle } from "drizzle-orm/mysql2";
 import {
   activities,
   competencies,
+  courseLessons,
+  courseModules,
   courseResources,
   enrollments,
   grades,
@@ -34,6 +36,15 @@ async function requireDb() {
   const db = await getDb();
   if (!db) throw new Error("La base de datos no está disponible.");
   return db;
+}
+
+function readStringArray(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.every(item => typeof item === "string") ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -254,12 +265,29 @@ export async function createSubjectWithCurriculum(input: {
   studentIds?: number[];
   resources?: Array<{ title: string; description?: string | null; resourceType: "link" | "document" | "video" | "reading"; url?: string | null }>;
   competencies?: Array<{ title: string; description?: string | null; level: "basic" | "intermediate" | "advanced" }>;
+  modules?: Array<{
+    title: string;
+    overview: string;
+    learningObjectives: string[];
+    estimatedHours: number;
+    imageUrl?: string | null;
+    imagePrompt?: string | null;
+    lessons: Array<{ title: string; summary: string; explanation: string; keyTopics: string[]; classActivity?: string | null }>;
+  }>;
   createdBy: number;
 }) {
   const subjectId = await createSubject(input);
   for (const studentId of input.studentIds ?? []) await enrollStudent(studentId, subjectId);
   for (const resource of input.resources ?? []) await createCourseResource({ ...resource, subjectId, createdBy: input.createdBy });
   for (const competency of input.competencies ?? []) await createCompetency({ ...competency, subjectId });
+  for (let moduleIndex = 0; moduleIndex < (input.modules ?? []).length; moduleIndex += 1) {
+    const courseModule = (input.modules ?? [])[moduleIndex];
+    const moduleId = await createCourseModule({ ...courseModule, subjectId, sortOrder: moduleIndex + 1 });
+    for (let lessonIndex = 0; lessonIndex < courseModule.lessons.length; lessonIndex += 1) {
+      const lesson = courseModule.lessons[lessonIndex];
+      await createCourseLesson({ ...lesson, moduleId, sortOrder: lessonIndex + 1 });
+    }
+  }
   return subjectId;
 }
 
@@ -283,8 +311,14 @@ export async function deleteSubject(subjectId: number) {
   const db = await requireDb();
   const activityRows = await db.select({ id: activities.id }).from(activities).where(eq(activities.subjectId, subjectId));
   const activityIds = activityRows.map(row => row.id);
+  const moduleRows = await db.select({ id: courseModules.id }).from(courseModules).where(eq(courseModules.subjectId, subjectId));
+  const moduleIds = moduleRows.map(row => row.id);
   if (activityIds.length) await db.delete(submissions).where(inArray(submissions.activityId, activityIds));
+  if (moduleIds.length) await db.delete(courseLessons).where(inArray(courseLessons.moduleId, moduleIds));
   await db.delete(activities).where(eq(activities.subjectId, subjectId));
+  await db.delete(courseModules).where(eq(courseModules.subjectId, subjectId));
+  await db.delete(courseResources).where(eq(courseResources.subjectId, subjectId));
+  await db.delete(competencies).where(eq(competencies.subjectId, subjectId));
   await db.delete(enrollments).where(eq(enrollments.subjectId, subjectId));
   await db.delete(grades).where(eq(grades.subjectId, subjectId));
   await db.delete(subjects).where(eq(subjects.id, subjectId));
@@ -368,6 +402,47 @@ export async function createCompetency(input: {
   const db = await requireDb();
   const result = await db.insert(competencies).values(input);
   return Number(result[0].insertId);
+}
+
+export async function createCourseModule(input: {
+  subjectId: number;
+  title: string;
+  overview: string;
+  learningObjectives: string[];
+  estimatedHours: number;
+  imageUrl?: string | null;
+  imagePrompt?: string | null;
+  sortOrder: number;
+}) {
+  const db = await requireDb();
+  const result = await db.insert(courseModules).values({ ...input, learningObjectives: JSON.stringify(input.learningObjectives) });
+  return Number(result[0].insertId);
+}
+
+export async function createCourseLesson(input: {
+  moduleId: number;
+  title: string;
+  summary: string;
+  explanation: string;
+  keyTopics: string[];
+  classActivity?: string | null;
+  sortOrder: number;
+}) {
+  const db = await requireDb();
+  const result = await db.insert(courseLessons).values({ ...input, keyTopics: JSON.stringify(input.keyTopics) });
+  return Number(result[0].insertId);
+}
+
+export async function listCourseModulesForSubject(subjectId: number) {
+  const db = await requireDb();
+  const modules = await db.select().from(courseModules).where(eq(courseModules.subjectId, subjectId)).orderBy(courseModules.sortOrder);
+  if (!modules.length) return [];
+  const lessons = await db.select().from(courseLessons).where(inArray(courseLessons.moduleId, modules.map(item => item.id))).orderBy(courseLessons.sortOrder);
+  return modules.map(courseModule => ({
+    ...courseModule,
+    learningObjectives: readStringArray(courseModule.learningObjectives),
+    lessons: lessons.filter(lesson => lesson.moduleId === courseModule.id).map(lesson => ({ ...lesson, keyTopics: readStringArray(lesson.keyTopics) })),
+  }));
 }
 
 export async function listMessageRecipients(subjectId: number) {

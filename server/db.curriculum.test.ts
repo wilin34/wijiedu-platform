@@ -21,10 +21,29 @@ describe("createSubjectWithCurriculum", () => {
       period: "QA",
       color: "#4F8EF7",
       studentIds: selectedStudentIds,
+      modules: [{
+        title: "Módulo temporal de validación",
+        overview: "Módulo temporal creado para comprobar el guardado de objetivos, lecciones y contenidos detallados.",
+        learningObjectives: ["Reconocer el flujo de persistencia", "Verificar las lecciones creadas"],
+        estimatedHours: 2,
+        imagePrompt: "Ilustración temporal para validación",
+        lessons: [{
+          title: "Lección temporal de validación",
+          summary: "Lección creada por la prueba de integración del currículo detallado.",
+          explanation: "Esta explicación temporal verifica que el contenido detallado de una clase se almacene junto con sus temas clave y pueda ser consultado después de crear la materia.",
+          keyTopics: ["Persistencia", "Módulos", "Lecciones"],
+          classActivity: "Revisar el registro persistido.",
+        }],
+      }],
       createdBy: 570001,
     });
 
     const enrolled = await db.listEnrollmentsForSubject(createdSubjectId);
     expect(enrolled.map(item => item.studentId).sort()).toEqual([...selectedStudentIds].sort());
+    const modules = await db.listCourseModulesForSubject(createdSubjectId);
+    expect(modules).toHaveLength(1);
+    expect(modules[0].learningObjectives).toContain("Reconocer el flujo de persistencia");
+    expect(modules[0].lessons).toHaveLength(1);
+    expect(modules[0].lessons[0].keyTopics).toContain("Módulos");
   });
 });

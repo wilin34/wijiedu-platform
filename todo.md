@@ -65,3 +65,9 @@
 - [x] Verificar permisos, enlaces y visualización de clases en vivo.
 - [x] Incorporar edición y cambio de estado para clases en vivo desde administración.
 - [x] Validar el recorrido de administración y estudiante con una clase publicada temporal.
+- [x] Modelar módulos curriculares detallados, temas, explicaciones y resultados de aprendizaje.
+- [x] Extender la IA para proponer materias con competencias, módulos, lecciones y recursos ilustrativos.
+- [x] Persistir módulos y lecciones asociados a cada materia con permisos académicos.
+- [x] Crear una página de detalle al abrir una materia con su programa, módulos y contenidos.
+- [x] Incorporar imágenes educativas apropiadas en la presentación de los módulos.
+- [x] Verificar creación con IA, acceso por roles y visualización detallada de la materia.

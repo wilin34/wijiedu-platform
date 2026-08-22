@@ -38,6 +38,7 @@ const dbMocks = {
   getLiveClassById: vi.fn(async () => ({ id: 61, subjectId: 7, createdBy: 1 })),
   updateLiveClass: vi.fn(async () => undefined),
   deleteLiveClass: vi.fn(async () => undefined),
+  listCourseModulesForSubject: vi.fn(async () => [{ id: 71, subjectId: 7, title: "Módulo de prueba", learningObjectives: ["Aplicar conceptos"], lessons: [{ id: 72, title: "Clase de prueba", keyTopics: ["Tema"] }] }]),
 };
 
 vi.mock("./db", () => dbMocks);
@@ -112,6 +113,13 @@ describe("router académico", () => {
     const student = appRouter.createCaller(context("student", 5));
     await expect(student.academic.messages.send({ subjectId: 7, recipientId: 2, body: "Tengo una duda sobre la actividad." })).resolves.toEqual({ id: 44 });
     expect(dbMocks.createMessage).toHaveBeenCalledWith(expect.objectContaining({ subjectId: 7, senderId: 5, recipientId: 2 }));
+  });
+
+  it("expone los módulos detallados solo a quienes tienen acceso a la materia", async () => {
+    const student = appRouter.createCaller(context("student", 5));
+    await expect(student.academic.curriculum.modules({ subjectId: 7 })).resolves.toHaveLength(1);
+    expect(dbMocks.listCourseModulesForSubject).toHaveBeenCalledWith(7);
+    await expect(student.academic.ai.createGeneratedCourse({ topic: "Economía aplicada", level: "intermediate", period: "2026-1" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("reserva la publicación de clases de Meet para administración y permite su consulta al estudiante", async () => {
