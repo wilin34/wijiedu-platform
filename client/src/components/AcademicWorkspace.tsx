@@ -84,25 +84,25 @@ async function fileToPayload(file: File | null) {
 }
 
 function EmptyState({ icon: Icon, title, description }: { icon: typeof BookOpen; title: string; description: string }) {
-  return <div className="wij-card flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"><div className="mb-3 rounded-xl bg-[#162040] p-3 text-[#75A7FF]"><Icon className="h-6 w-6" /></div><h3 className="font-display text-base font-bold text-white">{title}</h3><p className="mt-1 max-w-sm text-sm leading-6 text-[#8898AA]">{description}</p></div>;
+  return <div className="wij-card flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center"><div className="mb-3 rounded-md border border-[#C9AA68]/30 bg-[#183752] p-3 text-[#E3C584]"><Icon className="h-6 w-6" /></div><p className="institutional-kicker mb-1">Gestión académica</p><h3 className="font-display text-lg font-bold text-white">{title}</h3><p className="mt-1 max-w-sm text-sm leading-6 text-[#A7B8C7]">{description}</p></div>;
 }
 
 function SectionHeader({ icon: Icon, title, description, action }: { icon: typeof BookOpen; title: string; description: string; action?: React.ReactNode }) {
-  return <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="rounded-xl bg-[#4F8EF7]/15 p-2.5 text-[#75A7FF]"><Icon className="h-5 w-5" /></div><div><h2 className="font-display text-xl font-bold text-white">{title}</h2><p className="mt-0.5 text-sm text-[#8898AA]">{description}</p></div></div>{action}</div>;
+  return <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-[#284761] pb-4"><div className="flex items-center gap-3"><div className="rounded-md border border-[#C9AA68]/30 bg-[#183752] p-2.5 text-[#E3C584]"><Icon className="h-5 w-5" /></div><div><p className="institutional-kicker">Administración académica</p><h2 className="font-display text-2xl font-bold text-white">{title}</h2><p className="mt-0.5 text-sm text-[#A7B8C7]">{description}</p></div></div>{action}</div>;
 }
 
-function StatCard({ icon: Icon, value, label, tint }: { icon: typeof Users; value: string | number; label: string; tint: string }) {
-  return <div className="wij-card flex items-center gap-3 p-4"><div className={`flex h-12 w-12 items-center justify-center rounded-xl ${tint}`}><Icon className="h-5 w-5" /></div><div><p className="font-display text-2xl font-extrabold text-white">{value}</p><p className="mt-0.5 text-xs text-[#8898AA]">{label}</p></div></div>;
+function StatCard({ icon: Icon, value, label }: { icon: typeof Users; value: string | number; label: string; tint: string }) {
+  return <div className="wij-card flex items-center gap-3 p-4"><div className="flex h-12 w-12 items-center justify-center rounded-md border border-[#C9AA68]/30 bg-[#183752] text-[#E3C584]"><Icon className="h-5 w-5" /></div><div><p className="font-display text-2xl font-bold text-white">{value}</p><p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.06em] text-[#A7B8C7]">{label}</p></div></div>;
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) { return <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.05em] text-[#8898AA]">{children}</label>; }
+function FieldLabel({ children }: { children: React.ReactNode }) { return <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#C9AA68]">{children}</label>; }
 
 export default function AcademicWorkspace() {
   const { user } = useAuth();
   const role = normaliseRole(user?.role);
   const isStaff = role === "admin" || role === "teacher";
   const isAdmin = role === "admin";
-  const [active, setActive] = useState("dashboard");
+  const [active, setActive] = useState(() => typeof window === "undefined" ? "dashboard" : new URLSearchParams(window.location.search).get("view") || "dashboard");
   const utils = trpc.useUtils();
   const [studentDialog, setStudentDialog] = useState(false);
   const [subjectDialog, setSubjectDialog] = useState(false);

@@ -41,3 +41,14 @@
 - [x] Verificar los flujos de cuentas internas, mensajería y entregas por rol.
 - [x] Comprobar que la creación de materias inscriba cada estudiante seleccionado en la capa de datos.
 - [x] Verificar de extremo a extremo las cuentas internas y las acciones de estudiante y docente.
+- [x] Definir una identidad visual formal e institucional para WijiEdu.
+- [x] Rediseñar navegación, cabeceras, tarjetas, formularios y tablas con una estética institucional coherente.
+- [x] Verificar la presentación formal en escritorio y móvil.
+- [x] Rediseñar tablas, estados y acciones de los módulos internos con el sistema visual institucional.
+- [x] Revisar visualmente el dashboard autenticado y los módulos internos principales tras el rediseño.
+- [x] Aplicar estilos institucionales explícitos a estados, badges y acciones de los módulos académicos.
+- [x] Validar visualmente las vistas internas desde una sesión autenticada real.
+- [x] Documentar la sesión autenticada y las rutas internas verificadas durante la revisión visual.
+- [x] Ejecutar y registrar una comprobación autenticada verificable de las rutas internas del portal.
+- [x] Automatizar una prueba HTTP autenticada para las rutas internas del portal.
+- [x] Añadir una prueba versionada de acceso autenticado a materias, usuarios y recursos internos.
