@@ -158,18 +158,18 @@ function fallbackAssessment(module: { title: string; overview: string }) {
 }
 
 async function generateModuleAssessment(module: { title: string; overview: string; learningObjectives: string[]; lessons: Array<{ title: string; summary: string; keyTopics: string[] }> }) {
-  const lessonContext = module.lessons.map(lesson => `Clase: ${lesson.title}. Resumen: ${lesson.summary}. Temas: ${lesson.keyTopics.join(", ")}.`).join("\n");
-  const response = await invokeLLM({
-    model: "claude-haiku-4-5",
-    maxTokens: 4000,
-    messages: [
-      { role: "system", content: "Eres un docente experto en evaluación formativa. Responde únicamente JSON válido, en español, sin Markdown." },
-      { role: "user", content: `Crea una evaluación de cierre del módulo "${module.title}". Contexto: ${module.overview}. Objetivos: ${module.learningObjectives.join("; ")}. Contenidos:\n${lessonContext}\nDevuelve JSON con title, description, passingScore (70), y questions. Incluye exactamente 5 preguntas de opción múltiple con id, prompt, options (exactamente 4), correctOption (índice 0 a 3) y explanation. Evalúa comprensión y aplicación; evita preguntas ambiguas, trampas y contenido ajeno al módulo.` },
-    ],
-  });
-  const content = response.choices?.[0]?.message.content;
-  if (typeof content !== "string") return fallbackAssessment(module);
   try {
+    const lessonContext = module.lessons.map(lesson => `Clase: ${lesson.title}. Resumen: ${lesson.summary}. Temas: ${lesson.keyTopics.join(", ")}.`).join("\n");
+    const response = await invokeLLM({
+      model: "claude-haiku-4-5",
+      maxTokens: 4000,
+      messages: [
+        { role: "system", content: "Eres un docente experto en evaluación formativa. Responde únicamente JSON válido, en español, sin Markdown." },
+        { role: "user", content: `Crea una evaluación de cierre del módulo "${module.title}". Contexto: ${module.overview}. Objetivos: ${module.learningObjectives.join("; ")}. Contenidos:\n${lessonContext}\nDevuelve JSON con title, description, passingScore (70), y questions. Incluye exactamente 5 preguntas de opción múltiple con id, prompt, options (exactamente 4), correctOption (índice 0 a 3) y explanation. Evalúa comprensión y aplicación; evita preguntas ambiguas, trampas y contenido ajeno al módulo.` },
+      ],
+    });
+    const content = response.choices?.[0]?.message.content;
+    if (typeof content !== "string") return fallbackAssessment(module);
     const parsed = generatedAssessment.safeParse(JSON.parse(content));
     return parsed.success ? parsed.data : fallbackAssessment(module);
   } catch {
@@ -248,6 +248,15 @@ export const academicRouter = router({
     setRole: protectedProcedure.input(z.object({ userId: z.number().int().positive(), role: z.enum(["admin", "teacher", "student"]) })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
       await db.updateUserRole(input.userId, input.role);
+      return { success: true };
+    }),
+    remove: protectedProcedure.input(z.object({ userId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx.user);
+      if (input.userId === ctx.user.id) throw new TRPCError({ code: "BAD_REQUEST", message: "No puedes eliminar tu propia cuenta mientras tienes la sesión abierta." });
+      const account = await db.getUserById(input.userId);
+      if (!account) throw new TRPCError({ code: "NOT_FOUND", message: "Usuario no encontrado." });
+      if (account.role === "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Las cuentas administradoras están protegidas y no se pueden eliminar desde el portal." });
+      await db.deleteUserAccount(input.userId);
       return { success: true };
     }),
     create: protectedProcedure.input(z.object({ name: z.string().trim().min(2).max(180), email: z.string().trim().email().max(320), password: z.string().min(8).max(128), role: z.enum(["teacher", "student"]) })).mutation(async ({ ctx, input }) => {
@@ -511,10 +520,12 @@ export const academicRouter = router({
       const modules = await Promise.all(proposal.modules.map(async courseModule => {
         try {
           const image = await generateImage({ prompt: `${courseModule.imagePrompt}. Ilustración horizontal para una plataforma educativa institucional, composición limpia, no incluir palabras, letras, números ni marcas.` });
-          return { ...courseModule, imageUrl: image.url };
+          const assessment = await generateModuleAssessment(courseModule);
+          return { ...courseModule, imageUrl: image.url, assessment };
         } catch (error) {
           console.warn("[Curriculum] No fue posible generar la ilustración del módulo:", error);
-          return { ...courseModule, imageUrl: null };
+          const assessment = await generateModuleAssessment(courseModule);
+          return { ...courseModule, imageUrl: null, assessment };
         }
       }));
       const id = await db.createSubjectWithCurriculum({ ...proposal, modules, period: input.period, color: "#B69A5E", createdBy: ctx.user.id });

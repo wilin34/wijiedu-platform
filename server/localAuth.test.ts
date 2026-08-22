@@ -65,6 +65,6 @@ describe("localAuth", () => {
     mocks.getUserByEmail.mockResolvedValueOnce({ ...localUser, passwordHash: "scrypt$abc$0011" });
     const { ctx } = context();
 
-    await expect(appRouter.createCaller(ctx).localAuth.login({ email: "cuenta@wijiedu.test", password: "incorrecta" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(appRouter.createCaller(ctx).localAuth.login({ email: "cuenta@wijiedu.test", password: "incorrecta" })).rejects.toMatchObject({ code: "UNAUTHORIZED", message: "Datos incorrectos." });
   });
 });

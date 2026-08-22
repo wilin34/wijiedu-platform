@@ -4,6 +4,8 @@ import type { TrpcContext } from "./_core/context";
 const dbMocks = {
   listUsers: vi.fn(async () => [{ id: 4, role: "teacher", name: "Docente" }]),
   updateUserRole: vi.fn(async () => undefined),
+  getUserById: vi.fn(async (id: number) => ({ id, role: id === 1 ? "admin" : "teacher", name: "Cuenta" })),
+  deleteUserAccount: vi.fn(async () => undefined),
   getUserByEmail: vi.fn(async () => undefined),
   createLocalUser: vi.fn(async () => ({ id: 19, name: "Cuenta", email: "cuenta@wijiedu.test", role: "teacher" })),
   createStudent: vi.fn(async () => 18),
@@ -52,6 +54,8 @@ const dbMocks = {
 
 vi.mock("./db", () => dbMocks);
 vi.mock("./storage", () => ({ storagePut: vi.fn(async () => ({ key: "file-key", url: "/manus-storage/file-key" })) }));
+vi.mock("./_core/llm", () => ({ invokeLLM: vi.fn(async () => ({ choices: [{ message: { content: "respuesta no estructurada" } }] })) }));
+vi.mock("./_core/imageGeneration", () => ({ generateImage: vi.fn(async () => ({ url: "/manus-storage/illustration.png" })) }));
 
 const { appRouter } = await import("./routers");
 
@@ -72,6 +76,9 @@ describe("router académico", () => {
     const admin = appRouter.createCaller(context("admin"));
     await expect(admin.academic.users.list()).resolves.toHaveLength(1);
     await expect(admin.academic.users.setRole({ userId: 4, role: "teacher" })).resolves.toEqual({ success: true });
+    await expect(admin.academic.users.remove({ userId: 4 })).resolves.toEqual({ success: true });
+    expect(dbMocks.deleteUserAccount).toHaveBeenCalledWith(4);
+    await expect(admin.academic.users.remove({ userId: 1 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(admin.academic.users.create({ name: "Docente Nuevo", email: "nuevo@wijiedu.test", password: "Segura123", role: "teacher" })).resolves.toEqual({ id: 19 });
     expect(dbMocks.createLocalUser).toHaveBeenCalledWith(expect.objectContaining({ role: "teacher", email: "nuevo@wijiedu.test", passwordHash: expect.stringMatching(/^scrypt\$/) }));
     await expect(admin.academic.students.create(studentData)).resolves.toEqual({ id: 18 });
@@ -79,6 +86,7 @@ describe("router académico", () => {
     await expect(admin.academic.students.remove({ id: 18 })).resolves.toEqual({ success: true });
     const student = appRouter.createCaller(context("student"));
     await expect(student.academic.users.list()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(student.academic.users.remove({ userId: 4 })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(student.academic.students.create(studentData)).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
@@ -129,6 +137,17 @@ describe("router académico", () => {
     await expect(student.academic.curriculum.modules({ subjectId: 7 })).resolves.toHaveLength(1);
     expect(dbMocks.listCourseModulesForSubject).toHaveBeenCalledWith(7);
     await expect(student.academic.ai.createGeneratedCourse({ topic: "Economía aplicada", level: "intermediate", period: "2026-1" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("permite a administración generar una materia completa con competencias, módulos e ilustraciones", async () => {
+    const admin = appRouter.createCaller(context("admin"));
+    await expect(admin.academic.ai.createGeneratedCourse({ topic: "Gestión de proyectos", level: "intermediate", period: "2026-2" })).resolves.toMatchObject({ id: 22 });
+    expect(dbMocks.createSubjectWithCurriculum).toHaveBeenLastCalledWith(expect.objectContaining({
+      name: "Gestión de proyectos",
+      period: "2026-2",
+      competencies: expect.arrayContaining([expect.objectContaining({ title: expect.stringContaining("Gestión de proyectos") })]),
+      modules: expect.arrayContaining([expect.objectContaining({ imageUrl: "/manus-storage/illustration.png", lessons: expect.any(Array), assessment: expect.objectContaining({ questions: expect.any(Array), passingScore: 70 }) })]),
+    }));
   });
 
   it("permite al estudiante resolver evaluaciones y registrar avance sin exponer respuestas correctas", async () => {

@@ -60,7 +60,7 @@ export const appRouter = router({
     login: publicProcedure.input(z.object({ email: z.string().trim().toLowerCase().email().max(320), password: z.string().min(1).max(128) })).mutation(async ({ ctx, input }) => {
       const user = await db.getUserByEmail(input.email);
       if (!user?.passwordHash || !(await passwordMatches(input.password, user.passwordHash))) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Correo o contraseña incorrectos." });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Datos incorrectos." });
       }
       await db.updateLastSignedIn(user.id);
       ctx.res.cookie(COOKIE_NAME, await createLocalSession(user), { ...getSessionCookieOptions(ctx.req), maxAge: 7 * 24 * 60 * 60 * 1000 });

@@ -79,3 +79,17 @@
 - [x] Verificar generación, respuestas, permisos y cálculo de progreso académico.
 - [x] Generar y descargar un PDF institucional con el plan completo de cada materia.
 - [x] Verificar permisos, contenido y descarga del PDF curricular.
+- [x] Diseñar un asistente de IA integrado en la vista de cada materia para ampliar su contenido curricular.
+- [x] Permitir a administración generar y aplicar una propuesta curricular completa desde la materia.
+- [x] Incluir competencias, módulos, lecciones, recursos, evaluaciones e ilustraciones en la propuesta generada.
+- [x] Refinar iconos, contenedores y estados visuales para una apariencia institucional más natural.
+- [x] Verificar el asistente curricular integrado y la iconografía en escritorio y móvil.
+- [x] Generar evaluaciones de cierre automáticamente para cada módulo de una materia creada con IA.
+- [x] Verificar que la creación IA persista evaluaciones de módulo junto al programa académico.
+- [x] Implementar eliminación segura de usuarios desde administración y proteger la cuenta administradora actual.
+- [x] Eliminar datos académicos dependientes al borrar una cuenta de usuario cuando corresponda.
+- [x] Unificar el mensaje de inicio de sesión fallido como “Datos incorrectos” sin revelar si existe el correo.
+- [x] Añadir controles visuales de eliminación y validar el flujo de acceso inválido.
+- [x] Completar la limpieza de evaluaciones y referencias de autoría al eliminar una cuenta de usuario.
+- [x] Verificar mediante pruebas que la eliminación sane todas las referencias académicas dependientes.
+- [x] Ampliar la prueba de integración para cubrir recursos, clases en vivo, mensajes, entregas y perfiles estudiantiles al eliminar una cuenta.

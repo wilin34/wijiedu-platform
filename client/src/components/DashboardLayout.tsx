@@ -72,7 +72,7 @@ export default function DashboardLayout({
       {mobileOpen && <button className="fixed inset-0 z-30 bg-black/60 lg:hidden" aria-label="Cerrar menú" onClick={() => setMobileOpen(false)} />}
       <aside className={cn("fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[#42463F] bg-[#1C201D] transition-all duration-200", collapsed ? "w-[72px]" : "w-[268px]", mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0")}>
         <div className="flex min-h-[78px] items-center gap-3 border-b border-[#42463F] px-5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#B69A5E] text-[#171A17]"><GraduationCap className="h-5 w-5" /></div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#D8BF86]/45 bg-[#B69A5E] text-[#171A17] shadow-[inset_0_1px_0_rgba(255,255,255,.28)]"><GraduationCap className="h-5 w-5" strokeWidth={1.8} /></div>
           {!collapsed && <div className="min-w-0"><p className="font-display text-xl font-bold tracking-tight text-white">WijiEdu</p><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#C8AE72]">Gestión académica</p></div>}
         </div>
         <button className="flex items-center gap-3 border-b border-[#42463F] px-5 py-4 text-left transition hover:bg-[#242724]" onClick={() => onNavigate("dashboard")}>
@@ -84,19 +84,19 @@ export default function DashboardLayout({
           {shownItems.map(item => {
             const Icon = item.icon;
             const active = item.id === activeItem;
-            return <button key={item.id} onClick={() => { onNavigate(item.id); setMobileOpen(false); }} className={cn("mb-1 flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition", active ? "border-l-2 border-[#C9AA68] bg-[#183752] font-semibold text-[#F2DFC0]" : "border-l-2 border-transparent text-[#A7B8C7] hover:bg-[#102A45] hover:text-[#ECF2F7]", collapsed && "justify-center px-0")} title={collapsed ? item.label : undefined}><Icon className="h-[18px] w-[18px] shrink-0" />{!collapsed && <span>{item.label}</span>}</button>;
+            return <button key={item.id} onClick={() => { onNavigate(item.id); setMobileOpen(false); }} className={cn("mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition", active ? "border border-[#C8AE72]/25 bg-[#343A33] font-semibold text-[#F2DFC0] shadow-[inset_0_1px_0_rgba(255,255,255,.04)]" : "border border-transparent text-[#B8BBB2] hover:bg-[#242724] hover:text-[#F1F0EA]", collapsed && "justify-center px-0")} title={collapsed ? item.label : undefined}><span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition", active ? "bg-[#B69A5E]/18 text-[#E4D0A0]" : "bg-[#343A33] text-[#B8BBB2]")}><Icon className="h-[17px] w-[17px]" strokeWidth={1.8} /></span>{!collapsed && <span>{item.label}</span>}</button>;
           })}
         </nav>
-        <div className="border-t border-[#284761] p-3">
-          <button onClick={logout} className={cn("flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm text-[#A7B8C7] transition hover:bg-[#EF4444]/10 hover:text-[#FCA5A5]", collapsed && "justify-center px-0")} title={collapsed ? "Salir" : undefined}><LogOut className="h-[18px] w-[18px]" />{!collapsed && "Cerrar sesión"}</button>
+        <div className="border-t border-[#42463F] p-3">
+          <button onClick={logout} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[#B8BBB2] transition hover:bg-[#432726] hover:text-[#F3C2C2]", collapsed && "justify-center px-0")} title={collapsed ? "Salir" : undefined}><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#343A33]"><LogOut className="h-[17px] w-[17px]" strokeWidth={1.8} /></span>{!collapsed && "Cerrar sesión"}</button>
         </div>
       </aside>
       <div className={cn("min-h-screen transition-[margin] duration-200", collapsed ? "lg:ml-[72px]" : "lg:ml-[268px]")}>
-        <header className="sticky top-0 z-20 flex h-[72px] items-center gap-3 border-b border-[#284761] bg-[#0C2138]/95 px-4 backdrop-blur lg:px-8">
-          <button className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#8898AA] hover:bg-[#162040] hover:text-white lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Abrir menú"><Menu className="h-5 w-5" /></button>
-          <button className="hidden h-9 w-9 items-center justify-center rounded-lg text-[#8898AA] hover:bg-[#162040] hover:text-white lg:inline-flex" onClick={() => setCollapsed(value => !value)} aria-label="Mostrar u ocultar menú">{collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}</button>
+        <header className="sticky top-0 z-20 flex h-[72px] items-center gap-3 border-b border-[#42463F] bg-[#171A17]/95 px-4 backdrop-blur lg:px-8">
+          <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-[#B8BBB2] hover:bg-[#343A33] hover:text-white lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Abrir menú"><Menu className="h-5 w-5" strokeWidth={1.8} /></button>
+          <button className="hidden h-9 w-9 items-center justify-center rounded-xl text-[#B8BBB2] hover:bg-[#343A33] hover:text-white lg:inline-flex" onClick={() => setCollapsed(value => !value)} aria-label="Mostrar u ocultar menú">{collapsed ? <PanelLeftOpen className="h-5 w-5" strokeWidth={1.8} /> : <PanelLeftClose className="h-5 w-5" strokeWidth={1.8} />}</button>
           <div className="flex-1"><p className="hidden text-[10px] font-bold uppercase tracking-[0.15em] text-[#C9AA68] sm:block">Institución educativa</p><h2 className="font-display text-xl font-bold text-white">{pageTitle}</h2></div>
-          <span className="hidden items-center gap-2 text-xs text-[#9AAFC1] sm:flex"><Landmark className="h-3.5 w-3.5 text-[#C9AA68]" />{user.email || "Sesión institucional"}</span>
+          <span className="hidden items-center gap-2 text-xs text-[#B8BBB2] sm:flex"><Landmark className="h-3.5 w-3.5 text-[#D8BF86]" strokeWidth={1.8} />{user.email || "Sesión institucional"}</span>
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#B99757] text-[11px] font-bold text-[#07182B]">{initials}</span>
         </header>
         <main className="p-4 lg:p-7">{children}</main>

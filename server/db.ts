@@ -124,6 +124,35 @@ export async function updateUserRole(userId: number, role: "admin" | "teacher" |
   await db.update(users).set({ role }).where(eq(users.id, userId));
 }
 
+export async function deleteUserAccount(userId: number) {
+  const db = await requireDb();
+  const studentProfiles = await db.select({ id: students.id }).from(students).where(eq(students.userId, userId));
+  const studentIds = studentProfiles.map(profile => profile.id);
+  const createdActivities = await db.select({ id: activities.id }).from(activities).where(eq(activities.createdBy, userId));
+  const activityIds = createdActivities.map(activity => activity.id);
+  const createdAssessments = await db.select({ id: moduleAssessments.id }).from(moduleAssessments).where(eq(moduleAssessments.createdBy, userId));
+  const assessmentIds = createdAssessments.map(assessment => assessment.id);
+  if (activityIds.length) await db.delete(submissions).where(inArray(submissions.activityId, activityIds));
+  if (assessmentIds.length) await db.delete(moduleAssessmentAttempts).where(inArray(moduleAssessmentAttempts.assessmentId, assessmentIds));
+  if (studentIds.length) {
+    await db.delete(moduleAssessmentAttempts).where(inArray(moduleAssessmentAttempts.studentId, studentIds));
+    await db.delete(lessonProgress).where(inArray(lessonProgress.studentId, studentIds));
+    await db.delete(enrollments).where(inArray(enrollments.studentId, studentIds));
+    await db.delete(grades).where(inArray(grades.studentId, studentIds));
+    await db.delete(submissions).where(inArray(submissions.studentId, studentIds));
+    await db.delete(students).where(inArray(students.id, studentIds));
+  }
+  await db.delete(messages).where(or(eq(messages.senderId, userId), eq(messages.recipientId, userId)));
+  await db.delete(courseResources).where(eq(courseResources.createdBy, userId));
+  await db.delete(liveClasses).where(eq(liveClasses.createdBy, userId));
+  if (activityIds.length) await db.delete(activities).where(inArray(activities.id, activityIds));
+  if (assessmentIds.length) await db.delete(moduleAssessments).where(inArray(moduleAssessments.id, assessmentIds));
+  await db.delete(grades).where(eq(grades.gradedBy, userId));
+  await db.delete(submissions).where(eq(submissions.gradedBy, userId));
+  await db.update(subjects).set({ teacherId: null }).where(eq(subjects.teacherId, userId));
+  await db.delete(users).where(eq(users.id, userId));
+}
+
 export async function listStudents() {
   const db = await requireDb();
   return db.select().from(students).orderBy(desc(students.createdAt));
@@ -276,6 +305,7 @@ export async function createSubjectWithCurriculum(input: {
     imageUrl?: string | null;
     imagePrompt?: string | null;
     lessons: Array<{ title: string; summary: string; explanation: string; keyTopics: string[]; classActivity?: string | null }>;
+    assessment?: { title: string; description: string; questions: AssessmentQuestion[]; passingScore: number };
   }>;
   createdBy: number;
 }) {
@@ -290,6 +320,7 @@ export async function createSubjectWithCurriculum(input: {
       const lesson = courseModule.lessons[lessonIndex];
       await createCourseLesson({ ...lesson, moduleId, sortOrder: lessonIndex + 1 });
     }
+    if (courseModule.assessment) await createModuleAssessment({ ...courseModule.assessment, moduleId, status: "published", createdBy: input.createdBy });
   }
   return subjectId;
 }

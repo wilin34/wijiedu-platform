@@ -23,7 +23,7 @@ export default function Register() {
       toast.success("Acceso correcto.");
       window.location.href = "/";
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(error.data?.code === "UNAUTHORIZED" ? "Datos incorrectos." : error.message),
   });
   const pending = register.isPending || login.isPending;
 

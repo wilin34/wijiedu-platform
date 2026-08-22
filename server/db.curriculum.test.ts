@@ -34,6 +34,12 @@ describe("createSubjectWithCurriculum", () => {
           keyTopics: ["Persistencia", "Módulos", "Lecciones"],
           classActivity: "Revisar el registro persistido.",
         }],
+        assessment: {
+          title: "Evaluación temporal de cierre",
+          description: "Cuestionario de validación para comprobar que la evaluación se persiste junto al módulo.",
+          passingScore: 70,
+          questions: [{ id: "q1", prompt: "¿Qué se verifica al crear la materia temporal?", options: ["La persistencia curricular", "La eliminación de archivos", "La geolocalización", "La facturación"], correctOption: 0, explanation: "La prueba confirma que los elementos curriculares se guardan correctamente." }],
+        },
       }],
       createdBy: 570001,
     });
@@ -45,5 +51,8 @@ describe("createSubjectWithCurriculum", () => {
     expect(modules[0].learningObjectives).toContain("Reconocer el flujo de persistencia");
     expect(modules[0].lessons).toHaveLength(1);
     expect(modules[0].lessons[0].keyTopics).toContain("Módulos");
+    const assessments = await db.listModuleAssessments(modules[0].id, true);
+    expect(assessments).toHaveLength(1);
+    expect(assessments[0].title).toBe("Evaluación temporal de cierre");
   });
 });
