@@ -111,6 +111,16 @@ const activityInput = z.object({
   attachment: fileInput.nullable().optional(),
 });
 
+const liveClassInput = z.object({
+  subjectId: z.number().int().positive(),
+  title: z.string().trim().min(3).max(220),
+  description: z.string().trim().max(5000).nullable().optional(),
+  meetUrl: z.string().url().regex(/^https:\/\/meet\.google\.com\/[a-z0-9-]+/i, "Ingresa un enlace válido de Google Meet."),
+  startsAt: z.string().datetime(),
+  durationMinutes: z.number().int().min(15).max(480).default(60),
+  status: z.enum(["draft", "published", "completed", "cancelled"]).default("draft"),
+});
+
 async function uploadAttachment(userId: number, attachment?: z.infer<typeof fileInput> | null, category = "activities") {
   if (!attachment) return {};
   const bytes = Buffer.from(attachment.base64, "base64");
@@ -217,6 +227,26 @@ export const academicRouter = router({
       if (!activity) throw new TRPCError({ code: "NOT_FOUND", message: "Actividad no encontrada." });
       await assertSubjectManager(ctx.user, activity.subjectId);
       await db.deleteActivity(input.id);
+      return { success: true };
+    }),
+  }),
+
+  liveClasses: router({
+    list: protectedProcedure.query(async ({ ctx }) => db.listLiveClassesForUser({ ...ctx.user, role: roleForAccess(ctx.user.role) })),
+    create: protectedProcedure.input(liveClassInput).mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx.user);
+      return { id: await db.createLiveClass({ ...input, startsAt: new Date(input.startsAt), createdBy: ctx.user.id }) };
+    }),
+    update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: liveClassInput.omit({ subjectId: true }) })).mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx.user);
+      const liveClass = await db.getLiveClassById(input.id);
+      if (!liveClass) throw new TRPCError({ code: "NOT_FOUND", message: "Clase en vivo no encontrada." });
+      await db.updateLiveClass(input.id, { ...input.data, startsAt: new Date(input.data.startsAt) });
+      return { success: true };
+    }),
+    remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx.user);
+      await db.deleteLiveClass(input.id);
       return { success: true };
     }),
   }),

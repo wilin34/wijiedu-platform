@@ -58,3 +58,10 @@
 - [x] Revisar visualmente dashboard, materias, usuarios, actividades y centro de aprendizaje con la paleta neutra en escritorio y móvil.
 - [x] Reemplazar directamente los colores intensos residuales en los componentes académicos sin depender de reglas globales.
 - [x] Corregir el error de ejecución del centro de aprendizaje y repetir la revisión visual autenticada.
+- [x] Optimizar la distribución del portal para pantallas de computador.
+- [x] Persistir clases en vivo con materia, horario, enlace de Google Meet y estado de publicación.
+- [x] Permitir a administración crear, editar y publicar clases en vivo.
+- [x] Permitir a estudiantes inscritos consultar y unirse a clases publicadas.
+- [x] Verificar permisos, enlaces y visualización de clases en vivo.
+- [x] Incorporar edición y cambio de estado para clases en vivo desde administración.
+- [x] Validar el recorrido de administración y estudiante con una clase publicada temporal.

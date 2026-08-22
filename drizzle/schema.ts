@@ -164,6 +164,20 @@ export const messages = mysqlTable("messages", {
   readAt: timestamp("readAt"),
 });
 
+export const liveClasses = mysqlTable("live_classes", {
+  id: int("id").autoincrement().primaryKey(),
+  subjectId: int("subjectId").notNull(),
+  title: varchar("title", { length: 220 }).notNull(),
+  description: text("description"),
+  meetUrl: varchar("meetUrl", { length: 1024 }).notNull(),
+  startsAt: timestamp("startsAt").notNull(),
+  durationMinutes: int("durationMinutes").default(60).notNull(),
+  status: mysqlEnum("status", ["draft", "published", "completed", "cancelled"]).default("draft").notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Student = typeof students.$inferSelect;
@@ -173,3 +187,4 @@ export type Grade = typeof grades.$inferSelect;
 export type CourseResource = typeof courseResources.$inferSelect;
 export type Competency = typeof competencies.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type LiveClass = typeof liveClasses.$inferSelect;

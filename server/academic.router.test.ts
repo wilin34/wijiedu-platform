@@ -33,6 +33,11 @@ const dbMocks = {
   listMessageRecipients: vi.fn(async () => [{ id: 2, name: "Docente", email: "teacher@wijiedu.test", role: "teacher" }]),
   listMessagesForUser: vi.fn(async () => []),
   createMessage: vi.fn(async () => 44),
+  listLiveClassesForUser: vi.fn(async () => [{ id: 61, subjectId: 7, title: "Tutoría", meetUrl: "https://meet.google.com/abc-defg-hij", startsAt: new Date(), durationMinutes: 60, status: "published" }]),
+  createLiveClass: vi.fn(async () => 61),
+  getLiveClassById: vi.fn(async () => ({ id: 61, subjectId: 7, createdBy: 1 })),
+  updateLiveClass: vi.fn(async () => undefined),
+  deleteLiveClass: vi.fn(async () => undefined),
 };
 
 vi.mock("./db", () => dbMocks);
@@ -107,5 +112,20 @@ describe("router académico", () => {
     const student = appRouter.createCaller(context("student", 5));
     await expect(student.academic.messages.send({ subjectId: 7, recipientId: 2, body: "Tengo una duda sobre la actividad." })).resolves.toEqual({ id: 44 });
     expect(dbMocks.createMessage).toHaveBeenCalledWith(expect.objectContaining({ subjectId: 7, senderId: 5, recipientId: 2 }));
+  });
+
+  it("reserva la publicación de clases de Meet para administración y permite su consulta al estudiante", async () => {
+    const liveClass = { subjectId: 7, title: "Tutoría en vivo", meetUrl: "https://meet.google.com/abc-defg-hij", startsAt: new Date("2026-08-23T15:00:00.000Z").toISOString(), durationMinutes: 60, status: "published" as const };
+    const admin = appRouter.createCaller(context("admin"));
+    await expect(admin.academic.liveClasses.create(liveClass)).resolves.toEqual({ id: 61 });
+    await expect(admin.academic.liveClasses.create({ ...liveClass, meetUrl: "https://example.com/reunion" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(dbMocks.createLiveClass).toHaveBeenCalledWith(expect.objectContaining({ subjectId: 7, createdBy: 1, status: "published" }));
+    await expect(admin.academic.liveClasses.update({ id: 61, data: { ...liveClass, subjectId: undefined } })).resolves.toEqual({ success: true });
+    await expect(admin.academic.liveClasses.remove({ id: 61 })).resolves.toEqual({ success: true });
+    const student = appRouter.createCaller(context("student", 5));
+    await expect(student.academic.liveClasses.list()).resolves.toHaveLength(1);
+    await expect(student.academic.liveClasses.create(liveClass)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(student.academic.liveClasses.update({ id: 61, data: { ...liveClass, subjectId: undefined } })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(student.academic.liveClasses.remove({ id: 61 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

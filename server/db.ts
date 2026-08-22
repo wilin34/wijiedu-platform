@@ -7,6 +7,7 @@ import {
   enrollments,
   grades,
   InsertUser,
+  liveClasses,
   messages,
   students,
   subjects,
@@ -600,6 +601,68 @@ export async function gradeSubmission(submissionId: number, input: { score: numb
     .update(submissions)
     .set({ status: "graded", score: input.score, feedback: input.feedback ?? null, gradedBy: input.gradedBy, gradedAt: new Date() })
     .where(eq(submissions.id, submissionId));
+}
+
+export async function listLiveClassesForUser(user: { id: number; role: string; email?: string | null }) {
+  const db = await requireDb();
+  const base = {
+    id: liveClasses.id,
+    subjectId: liveClasses.subjectId,
+    title: liveClasses.title,
+    description: liveClasses.description,
+    meetUrl: liveClasses.meetUrl,
+    startsAt: liveClasses.startsAt,
+    durationMinutes: liveClasses.durationMinutes,
+    status: liveClasses.status,
+    createdBy: liveClasses.createdBy,
+    createdAt: liveClasses.createdAt,
+    subjectName: subjects.name,
+    subjectCode: subjects.code,
+  };
+  const query = db.select(base).from(liveClasses).innerJoin(subjects, eq(subjects.id, liveClasses.subjectId));
+  if (user.role === "admin") return query.orderBy(liveClasses.startsAt);
+  if (user.role === "teacher") return query.where(eq(subjects.teacherId, user.id)).orderBy(liveClasses.startsAt);
+  const student = await getStudentForUser(user.id, user.email);
+  if (!student) return [];
+  return query.innerJoin(enrollments, eq(enrollments.subjectId, subjects.id)).where(and(eq(enrollments.studentId, student.id), eq(liveClasses.status, "published"))).orderBy(liveClasses.startsAt);
+}
+
+export async function getLiveClassById(id: number) {
+  const db = await requireDb();
+  const result = await db.select().from(liveClasses).where(eq(liveClasses.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createLiveClass(input: {
+  subjectId: number;
+  title: string;
+  description?: string | null;
+  meetUrl: string;
+  startsAt: Date;
+  durationMinutes: number;
+  status: "draft" | "published" | "completed" | "cancelled";
+  createdBy: number;
+}) {
+  const db = await requireDb();
+  const result = await db.insert(liveClasses).values(input);
+  return Number(result[0].insertId);
+}
+
+export async function updateLiveClass(id: number, input: {
+  title: string;
+  description?: string | null;
+  meetUrl: string;
+  startsAt: Date;
+  durationMinutes: number;
+  status: "draft" | "published" | "completed" | "cancelled";
+}) {
+  const db = await requireDb();
+  await db.update(liveClasses).set(input).where(eq(liveClasses.id, id));
+}
+
+export async function deleteLiveClass(id: number) {
+  const db = await requireDb();
+  await db.delete(liveClasses).where(eq(liveClasses.id, id));
 }
 
 export async function getDashboardStats(user: { id: number; role: string; email?: string | null }) {
