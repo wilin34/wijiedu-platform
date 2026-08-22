@@ -2,9 +2,12 @@ import { and, avg, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   activities,
+  competencies,
+  courseResources,
   enrollments,
   grades,
   InsertUser,
+  messages,
   students,
   subjects,
   submissions,
@@ -72,7 +75,7 @@ export async function getUserByEmail(email: string) {
   return result[0];
 }
 
-export async function createLocalUser(input: { name: string; email: string; passwordHash: string }) {
+export async function createLocalUser(input: { name: string; email: string; passwordHash: string; role?: "admin" | "teacher" | "student" }) {
   const db = await requireDb();
   const openId = `local_${crypto.randomUUID().replace(/-/g, "")}`;
   const result = await db.insert(users).values({
@@ -81,11 +84,13 @@ export async function createLocalUser(input: { name: string; email: string; pass
     email: input.email,
     loginMethod: "local",
     passwordHash: input.passwordHash,
-    role: "student",
+    role: input.role ?? "student",
     lastSignedIn: new Date(),
   });
   const userId = Number(result[0].insertId);
-  await db.insert(students).values({ userId, fullName: input.name, email: input.email, status: "active" });
+  if ((input.role ?? "student") === "student") {
+    await db.insert(students).values({ userId, fullName: input.name, email: input.email, status: "active" });
+  }
   return getUserById(userId);
 }
 
@@ -238,6 +243,25 @@ export async function createSubject(input: {
   return Number(result[0].insertId);
 }
 
+export async function createSubjectWithCurriculum(input: {
+  code: string;
+  name: string;
+  description?: string | null;
+  period: string;
+  teacherId?: number | null;
+  color?: string;
+  studentIds?: number[];
+  resources?: Array<{ title: string; description?: string | null; resourceType: "link" | "document" | "video" | "reading"; url?: string | null }>;
+  competencies?: Array<{ title: string; description?: string | null; level: "basic" | "intermediate" | "advanced" }>;
+  createdBy: number;
+}) {
+  const subjectId = await createSubject(input);
+  for (const studentId of input.studentIds ?? []) await enrollStudent(studentId, subjectId);
+  for (const resource of input.resources ?? []) await createCourseResource({ ...resource, subjectId, createdBy: input.createdBy });
+  for (const competency of input.competencies ?? []) await createCompetency({ ...competency, subjectId });
+  return subjectId;
+}
+
 export async function updateSubject(
   subjectId: number,
   input: {
@@ -300,6 +324,74 @@ export async function isStudentEnrolled(studentId: number, subjectId: number) {
     .where(and(eq(enrollments.studentId, studentId), eq(enrollments.subjectId, subjectId)))
     .limit(1);
   return Boolean(result[0]);
+}
+
+export async function canAccessSubject(user: { id: number; role: string; email?: string | null }, subjectId: number) {
+  if (user.role === "admin") return true;
+  const subject = await getSubjectById(subjectId);
+  if (!subject) return false;
+  if (user.role === "teacher") return subject.teacherId === user.id;
+  const student = await getStudentForUser(user.id, user.email);
+  return Boolean(student && await isStudentEnrolled(student.id, subjectId));
+}
+
+export async function listCourseResources(subjectId: number) {
+  const db = await requireDb();
+  return db.select().from(courseResources).where(eq(courseResources.subjectId, subjectId)).orderBy(desc(courseResources.createdAt));
+}
+
+export async function createCourseResource(input: {
+  subjectId: number;
+  title: string;
+  description?: string | null;
+  resourceType: "link" | "document" | "video" | "reading";
+  url?: string | null;
+  createdBy: number;
+}) {
+  const db = await requireDb();
+  const result = await db.insert(courseResources).values(input);
+  return Number(result[0].insertId);
+}
+
+export async function listCompetencies(subjectId: number) {
+  const db = await requireDb();
+  return db.select().from(competencies).where(eq(competencies.subjectId, subjectId)).orderBy(competencies.createdAt);
+}
+
+export async function createCompetency(input: {
+  subjectId: number;
+  title: string;
+  description?: string | null;
+  level: "basic" | "intermediate" | "advanced";
+}) {
+  const db = await requireDb();
+  const result = await db.insert(competencies).values(input);
+  return Number(result[0].insertId);
+}
+
+export async function listMessageRecipients(subjectId: number) {
+  const db = await requireDb();
+  return db
+    .selectDistinct({ id: users.id, name: users.name, email: users.email, role: users.role })
+    .from(users)
+    .innerJoin(students, eq(students.userId, users.id))
+    .innerJoin(enrollments, eq(enrollments.studentId, students.id))
+    .where(eq(enrollments.subjectId, subjectId));
+}
+
+export async function listMessagesForUser(subjectId: number, userId: number) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(messages)
+    .where(and(eq(messages.subjectId, subjectId), or(eq(messages.senderId, userId), eq(messages.recipientId, userId))))
+    .orderBy(messages.createdAt);
+}
+
+export async function createMessage(input: { subjectId: number; senderId: number; recipientId: number; body: string }) {
+  const db = await requireDb();
+  const result = await db.insert(messages).values(input);
+  return Number(result[0].insertId);
 }
 
 export async function listActivitiesForUser(user: { id: number; role: string; email?: string | null }) {

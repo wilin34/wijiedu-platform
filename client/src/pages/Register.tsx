@@ -6,7 +6,7 @@ import { toast } from "sonner";
 type Mode = "register" | "login";
 
 export default function Register() {
-  const [mode, setMode] = useState<Mode>("register");
+  const [mode] = useState<Mode>("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,10 +48,7 @@ export default function Register() {
           <h1 className="font-display text-3xl font-extrabold text-white">WijiEdu</h1>
           <p className="mt-1 text-sm text-[#8898AA]">Tu espacio académico en un solo lugar</p>
         </div>
-        <div className="mb-6 grid grid-cols-2 rounded-xl bg-[#162040] p-1">
-          <button type="button" onClick={() => setMode("register")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${isRegister ? "bg-[#1C2A4A] text-white shadow" : "text-[#8898AA] hover:text-white"}`}>Registrarme</button>
-          <button type="button" onClick={() => setMode("login")} className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${!isRegister ? "bg-[#1C2A4A] text-white shadow" : "text-[#8898AA] hover:text-white"}`}>Entrar</button>
-        </div>
+        <p className="mb-6 text-center text-sm text-[#B8C4D6]">Ingresa con la cuenta creada por la administración académica.</p>
         <form className="space-y-4" onSubmit={submit}>
           {isRegister && <label className="block"><span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.05em] text-[#8898AA]">Nombre completo</span><input required autoComplete="name" className="wij-input" value={name} onChange={event => setName(event.target.value)} placeholder="Tu nombre" /></label>}
           <label className="block"><span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.05em] text-[#8898AA]">Correo electrónico</span><input required type="email" autoComplete="email" className="wij-input" value={email} onChange={event => setEmail(event.target.value)} placeholder="nombre@correo.com" /></label>

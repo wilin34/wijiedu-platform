@@ -4,10 +4,12 @@ import type { TrpcContext } from "./_core/context";
 const dbMocks = {
   listUsers: vi.fn(async () => [{ id: 4, role: "teacher", name: "Docente" }]),
   updateUserRole: vi.fn(async () => undefined),
+  getUserByEmail: vi.fn(async () => undefined),
+  createLocalUser: vi.fn(async () => ({ id: 19, name: "Cuenta", email: "cuenta@wijiedu.test", role: "teacher" })),
   createStudent: vi.fn(async () => 18),
   updateStudent: vi.fn(async () => undefined),
   deleteStudent: vi.fn(async () => undefined),
-  createSubject: vi.fn(async () => 22),
+  createSubjectWithCurriculum: vi.fn(async () => 22),
   updateSubject: vi.fn(async () => undefined),
   deleteSubject: vi.fn(async () => undefined),
   enrollStudent: vi.fn(async () => undefined),
@@ -27,6 +29,10 @@ const dbMocks = {
   createSubmission: vi.fn(async () => undefined),
   getSubmissionById: vi.fn(async () => ({ id: 33, activityId: 11, studentId: 5, subjectId: 7 })),
   gradeSubmission: vi.fn(async () => undefined),
+  canAccessSubject: vi.fn(async () => true),
+  listMessageRecipients: vi.fn(async () => [{ id: 2, name: "Docente", email: "teacher@wijiedu.test", role: "teacher" }]),
+  listMessagesForUser: vi.fn(async () => []),
+  createMessage: vi.fn(async () => 44),
 };
 
 vi.mock("./db", () => dbMocks);
@@ -43,7 +49,7 @@ function context(role: "admin" | "teacher" | "student", id = 1): TrpcContext {
 }
 
 const studentData = { fullName: "Ana Pérez", email: "ana@wijiedu.test" };
-const subjectData = { code: "MAT-01", name: "Matemáticas", period: "2026-1" };
+const subjectData = { code: "MAT-01", name: "Matemáticas", period: "2026-1", studentIds: [5, 6] };
 const gradeData = { studentId: 5, subjectId: 7, period: "2026-1", title: "Parcial", score: 95 };
 
 describe("router académico", () => {
@@ -51,6 +57,8 @@ describe("router académico", () => {
     const admin = appRouter.createCaller(context("admin"));
     await expect(admin.academic.users.list()).resolves.toHaveLength(1);
     await expect(admin.academic.users.setRole({ userId: 4, role: "teacher" })).resolves.toEqual({ success: true });
+    await expect(admin.academic.users.create({ name: "Docente Nuevo", email: "nuevo@wijiedu.test", password: "Segura123", role: "teacher" })).resolves.toEqual({ id: 19 });
+    expect(dbMocks.createLocalUser).toHaveBeenCalledWith(expect.objectContaining({ role: "teacher", email: "nuevo@wijiedu.test", passwordHash: expect.stringMatching(/^scrypt\$/) }));
     await expect(admin.academic.students.create(studentData)).resolves.toEqual({ id: 18 });
     await expect(admin.academic.students.update({ id: 18, data: { ...studentData, status: "active" } })).resolves.toEqual({ success: true });
     await expect(admin.academic.students.remove({ id: 18 })).resolves.toEqual({ success: true });
@@ -62,6 +70,7 @@ describe("router académico", () => {
   it("reserva materias, asignaciones e inscripciones para administración", async () => {
     const admin = appRouter.createCaller(context("admin"));
     await expect(admin.academic.subjects.create(subjectData)).resolves.toEqual({ id: 22 });
+    expect(dbMocks.createSubjectWithCurriculum).toHaveBeenCalledWith(expect.objectContaining({ studentIds: [5, 6] }));
     await expect(admin.academic.subjects.update({ id: 7, data: { ...subjectData, color: "#4F8EF7", active: true } })).resolves.toEqual({ success: true });
     await expect(admin.academic.subjects.enroll({ studentId: 5, subjectId: 7 })).resolves.toEqual({ success: true });
     await expect(admin.academic.subjects.unenroll({ studentId: 5, subjectId: 7 })).resolves.toEqual({ success: true });
@@ -92,5 +101,11 @@ describe("router académico", () => {
     await expect(teacher.academic.submissions.grade({ id: 33, score: 88, feedback: "Buen trabajo" })).resolves.toEqual({ success: true });
     await expect(teacher.academic.submissions.submit({ activityId: 11, content: "No permitido" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(student.academic.submissions.grade({ id: 33, score: 88 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("permite al estudiante enviar un mensaje al docente de su materia", async () => {
+    const student = appRouter.createCaller(context("student", 5));
+    await expect(student.academic.messages.send({ subjectId: 7, recipientId: 2, body: "Tengo una duda sobre la actividad." })).resolves.toEqual({ id: 44 });
+    expect(dbMocks.createMessage).toHaveBeenCalledWith(expect.objectContaining({ subjectId: 7, senderId: 5, recipientId: 2 }));
   });
 });

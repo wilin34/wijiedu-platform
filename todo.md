@@ -27,3 +27,17 @@
 - [x] Reproducir el bloqueo persistente de acceso informado por el usuario.
 - [x] Eliminar el estado de espera indefinida y habilitar una entrada funcional desde la pantalla inicial.
 - [x] Verificar un flujo de acceso completo desde una sesión sin credenciales válidas.
+- [x] Crear una cuenta local con rol de administrador usando los datos entregados por el usuario.
+- [x] Verificar que la nueva cuenta tenga permisos administrativos.
+- [x] Permitir seleccionar e inscribir estudiantes registrados durante la creación de materias.
+- [x] Trasladar el registro de estudiantes y docentes al módulo interno de usuarios y roles del portal.
+- [x] Añadir recursos, competencias y mensajería persistentes al modelo académico.
+- [x] Implementar una herramienta de IA para generar propuestas de cursos, recursos y competencias.
+- [x] Crear el curso de Finanzas con recursos y competencias académicas registradas.
+- [x] Habilitar a estudiantes para entregar actividades y enviar mensajes a sus docentes.
+- [x] Validar los flujos administrativos, docentes y estudiantiles añadidos.
+- [x] Corregir y verificar una respuesta real del proveedor de IA para propuestas curriculares.
+- [x] Añadir pruebas de inscripción automática al crear una materia con estudiantes seleccionados.
+- [x] Verificar los flujos de cuentas internas, mensajería y entregas por rol.
+- [x] Comprobar que la creación de materias inscriba cada estudiante seleccionado en la capa de datos.
+- [x] Verificar de extremo a extremo las cuentas internas y las acciones de estudiante y docente.

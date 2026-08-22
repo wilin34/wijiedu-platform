@@ -24,8 +24,8 @@ describe("ruta pública de registro", () => {
   it("se renderiza sin depender de una sesión académica válida", () => {
     const markup = renderToStaticMarkup(createElement(Register));
 
-    expect(markup).toContain("Crear mi cuenta");
-    expect(markup).toContain("Entrar");
+    expect(markup).toContain("Entrar a WijiEdu");
+    expect(markup).toContain("administración académica");
     expect(markup).toContain("WijiEdu");
   });
 
@@ -39,7 +39,7 @@ describe("ruta pública de registro", () => {
       )
     );
 
-    expect(markup).toContain("Crear mi cuenta");
+    expect(markup).toContain("Entrar a WijiEdu");
   });
 
   it("permanece disponible en /registro cuando existe una sesión local inválida", () => {

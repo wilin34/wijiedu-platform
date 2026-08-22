@@ -1,7 +1,10 @@
 import { TRPCError } from "@trpc/server";
+import { randomBytes, scrypt as scryptCallback } from "node:crypto";
+import { promisify } from "node:util";
 import { z } from "zod";
 import * as db from "../db";
 import { storagePut } from "../storage";
+import { invokeLLM } from "../_core/llm";
 import { protectedProcedure, router } from "../_core/trpc";
 
 type AppUser = { id: number; role: string; email?: string | null };
@@ -9,6 +12,24 @@ const roleForAccess = (role: string) => (role === "user" ? "student" : role);
 const isAdministrator = (user: AppUser) => roleForAccess(user.role) === "admin";
 const isTeacher = (user: AppUser) => roleForAccess(user.role) === "teacher";
 const isStaff = (user: AppUser) => isAdministrator(user) || isTeacher(user);
+const scrypt = promisify(scryptCallback);
+
+function fallbackCourseProposal(input: { topic: string; level: "basic" | "intermediate" | "advanced"; period: string }) {
+  const code = `CUR-${input.topic.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toUpperCase() || "NUEVO"}`;
+  return {
+    code,
+    name: input.topic,
+    description: `Propuesta curricular de ${input.topic} para el período ${input.period}.`,
+    resources: [
+      { title: `Guía introductoria de ${input.topic}`, description: "Material de lectura para orientar el aprendizaje.", resourceType: "reading", url: null },
+      { title: "Actividad práctica guiada", description: "Recurso para aplicar los conceptos principales.", resourceType: "document", url: null },
+    ],
+    competencies: [
+      { title: `Comprender fundamentos de ${input.topic}`, description: "Reconoce conceptos, vocabulario y aplicaciones esenciales.", level: "basic" },
+      { title: `Aplicar conocimientos de ${input.topic}`, description: "Resuelve situaciones prácticas y argumenta decisiones.", level: input.level },
+    ],
+  };
+}
 
 function forbid(message = "No tienes permiso para realizar esta acción."): never {
   throw new TRPCError({ code: "FORBIDDEN", message });
@@ -16,6 +37,12 @@ function forbid(message = "No tienes permiso para realizar esta acción."): neve
 
 function assertAdmin(user: AppUser) {
   if (!isAdministrator(user)) forbid("Esta acción requiere el rol de administrador.");
+}
+
+async function hashAccountPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = (await scrypt(password, salt, 64)) as Buffer;
+  return `scrypt$${salt}$${hash.toString("hex")}`;
 }
 
 async function assertSubjectManager(user: AppUser, subjectId: number) {
@@ -47,6 +74,25 @@ const subjectInput = z.object({
   period: z.string().trim().min(2).max(60),
   teacherId: z.number().int().positive().nullable().optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#4F8EF7"),
+  studentIds: z.array(z.number().int().positive()).default([]),
+});
+
+const resourceInput = z.object({
+  title: z.string().trim().min(2).max(220),
+  description: z.string().trim().max(5000).nullable().optional(),
+  resourceType: z.enum(["link", "document", "video", "reading"]),
+  url: z.string().url().max(1024).nullable().optional(),
+});
+
+const competencyInput = z.object({
+  title: z.string().trim().min(2).max(220),
+  description: z.string().trim().max(5000).nullable().optional(),
+  level: z.enum(["basic", "intermediate", "advanced"]),
+});
+
+const subjectCreateInput = subjectInput.extend({
+  resources: z.array(resourceInput).default([]),
+  competencies: z.array(competencyInput).default([]),
 });
 
 const fileInput = z.object({
@@ -88,6 +134,12 @@ export const academicRouter = router({
       await db.updateUserRole(input.userId, input.role);
       return { success: true };
     }),
+    create: protectedProcedure.input(z.object({ name: z.string().trim().min(2).max(180), email: z.string().trim().email().max(320), password: z.string().min(8).max(128), role: z.enum(["teacher", "student"]) })).mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx.user);
+      if (await db.getUserByEmail(input.email)) throw new TRPCError({ code: "CONFLICT", message: "Ya existe una cuenta con este correo." });
+      const user = await db.createLocalUser({ name: input.name, email: input.email.toLowerCase(), passwordHash: await hashAccountPassword(input.password), role: input.role });
+      return { id: user?.id };
+    }),
   }),
 
   students: router({
@@ -114,9 +166,10 @@ export const academicRouter = router({
 
   subjects: router({
     list: protectedProcedure.query(async ({ ctx }) => db.listSubjectsForUser({ ...ctx.user, role: roleForAccess(ctx.user.role) })),
-    create: protectedProcedure.input(subjectInput).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(subjectCreateInput).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
-      return { id: await db.createSubject(input) };
+      const { studentIds, resources, competencies, ...subject } = input;
+      return { id: await db.createSubjectWithCurriculum({ ...subject, studentIds, resources, competencies, createdBy: ctx.user.id }) };
     }),
     update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: subjectInput.extend({ active: z.boolean() }) })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
@@ -210,6 +263,61 @@ export const academicRouter = router({
       await assertSubjectManager(ctx.user, submission.subjectId);
       await db.gradeSubmission(input.id, { score: input.score, feedback: input.feedback, gradedBy: ctx.user.id });
       return { success: true };
+    }),
+  }),
+  curriculum: router({
+    resources: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, input.subjectId))) forbid("No tienes acceso a los recursos de esta materia.");
+      return db.listCourseResources(input.subjectId);
+    }),
+    competencies: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, input.subjectId))) forbid("No tienes acceso a las competencias de esta materia.");
+      return db.listCompetencies(input.subjectId);
+    }),
+    addResource: protectedProcedure.input(z.object({ subjectId: z.number().int().positive(), data: resourceInput })).mutation(async ({ ctx, input }) => {
+      await assertSubjectManager(ctx.user, input.subjectId);
+      return { id: await db.createCourseResource({ ...input.data, subjectId: input.subjectId, createdBy: ctx.user.id }) };
+    }),
+    addCompetency: protectedProcedure.input(z.object({ subjectId: z.number().int().positive(), data: competencyInput })).mutation(async ({ ctx, input }) => {
+      await assertSubjectManager(ctx.user, input.subjectId);
+      return { id: await db.createCompetency({ ...input.data, subjectId: input.subjectId }) };
+    }),
+  }),
+  messages: router({
+    recipients: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, input.subjectId))) forbid();
+      const subject = await db.getSubjectById(input.subjectId);
+      const students = await db.listMessageRecipients(input.subjectId);
+      const teacher = subject?.teacherId ? await db.getUserById(subject.teacherId) : undefined;
+      return [...students, ...(teacher ? [{ id: teacher.id, name: teacher.name, email: teacher.email, role: teacher.role }] : [])].filter(person => person.id !== ctx.user.id);
+    }),
+    list: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, input.subjectId))) forbid();
+      return db.listMessagesForUser(input.subjectId, ctx.user.id);
+    }),
+    send: protectedProcedure.input(z.object({ subjectId: z.number().int().positive(), recipientId: z.number().int().positive(), body: z.string().trim().min(1).max(5000) })).mutation(async ({ ctx, input }) => {
+      if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, input.subjectId))) forbid();
+      const recipients = await db.listMessageRecipients(input.subjectId);
+      const subject = await db.getSubjectById(input.subjectId);
+      const recipientAllowed = recipients.some(person => person.id === input.recipientId) || subject?.teacherId === input.recipientId || isAdministrator(ctx.user);
+      if (!recipientAllowed) forbid("La persona destinataria no pertenece a esta materia.");
+      return { id: await db.createMessage({ ...input, senderId: ctx.user.id }) };
+    }),
+  }),
+  ai: router({
+    generateCourse: protectedProcedure.input(z.object({ topic: z.string().trim().min(3).max(180), level: z.enum(["basic", "intermediate", "advanced"]), period: z.string().trim().min(2).max(60) })).mutation(async ({ ctx, input }) => {
+      if (!isStaff(ctx.user)) forbid("Solo el personal académico puede generar propuestas de curso.");
+      const response = await invokeLLM({
+        model: "claude-haiku-4-5",
+        maxTokens: 1800,
+        messages: [
+          { role: "system", content: "Eres diseñador curricular. Responde únicamente JSON válido y en español." },
+          { role: "user", content: `Diseña una propuesta de curso sobre ${input.topic} para nivel ${input.level} y período ${input.period}. Devuelve JSON con code, name, description, resources (máximo 4 objetos con title, description, resourceType: link/document/video/reading, url opcional) y competencies (máximo 4 objetos con title, description, level: basic/intermediate/advanced). No inventes enlaces externos: usa null para url cuando no haya un enlace verificable.` },
+        ],
+      });
+      const content = response.choices?.[0]?.message.content;
+      if (typeof content !== "string") return fallbackCourseProposal(input);
+      try { return JSON.parse(content); } catch { return fallbackCourseProposal(input); }
     }),
   }),
 });

@@ -64,6 +64,26 @@ export const subjects = mysqlTable(
   table => ({ codeUnique: uniqueIndex("subjects_code_unique").on(table.code) })
 );
 
+export const courseResources = mysqlTable("course_resources", {
+  id: int("id").autoincrement().primaryKey(),
+  subjectId: int("subjectId").notNull(),
+  title: varchar("title", { length: 220 }).notNull(),
+  description: text("description"),
+  resourceType: mysqlEnum("resourceType", ["link", "document", "video", "reading"]).default("reading").notNull(),
+  url: varchar("url", { length: 1024 }),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const competencies = mysqlTable("competencies", {
+  id: int("id").autoincrement().primaryKey(),
+  subjectId: int("subjectId").notNull(),
+  title: varchar("title", { length: 220 }).notNull(),
+  description: text("description"),
+  level: mysqlEnum("level", ["basic", "intermediate", "advanced"]).default("intermediate").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const enrollments = mysqlTable(
   "enrollments",
   {
@@ -134,9 +154,22 @@ export const grades = mysqlTable("grades", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const messages = mysqlTable("messages", {
+  id: int("id").autoincrement().primaryKey(),
+  subjectId: int("subjectId").notNull(),
+  senderId: int("senderId").notNull(),
+  recipientId: int("recipientId").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  readAt: timestamp("readAt"),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Student = typeof students.$inferSelect;
 export type Subject = typeof subjects.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type Grade = typeof grades.$inferSelect;
+export type CourseResource = typeof courseResources.$inferSelect;
+export type Competency = typeof competencies.$inferSelect;
+export type Message = typeof messages.$inferSelect;
