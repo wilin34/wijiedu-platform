@@ -73,7 +73,7 @@ const subjectInput = z.object({
   description: z.string().trim().max(5000).nullable().optional(),
   period: z.string().trim().min(2).max(60),
   teacherId: z.number().int().positive().nullable().optional(),
-  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#4F8EF7"),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#B69A5E"),
   studentIds: z.array(z.number().int().positive()).default([]),
 });
 

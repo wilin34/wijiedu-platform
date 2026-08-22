@@ -7,25 +7,25 @@
 @theme inline {
   --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Source Serif 4", Georgia, serif;
-  --color-background: #07182B;
-  --color-foreground: #ECF2F7;
-  --color-card: #102A45;
-  --color-card-foreground: #ECF2F7;
-  --color-popover: #0C2138;
-  --color-popover-foreground: #ECF2F7;
-  --color-primary: #B99757;
-  --color-primary-foreground: #07182B;
-  --color-secondary: #102A45;
-  --color-secondary-foreground: #ECF2F7;
-  --color-muted: #102A45;
-  --color-muted-foreground: #9AAFC1;
-  --color-accent: #183752;
-  --color-accent-foreground: #ECF2F7;
+  --color-background: #171A17;
+  --color-foreground: #F1F0EA;
+  --color-card: #242724;
+  --color-card-foreground: #F1F0EA;
+  --color-popover: #1C201D;
+  --color-popover-foreground: #F1F0EA;
+  --color-primary: #B69A5E;
+  --color-primary-foreground: #171A17;
+  --color-secondary: #2A2E29;
+  --color-secondary-foreground: #F1F0EA;
+  --color-muted: #2A2E29;
+  --color-muted-foreground: #B8BBB2;
+  --color-accent: #343A33;
+  --color-accent-foreground: #F1F0EA;
   --color-destructive: #EF4444;
   --color-destructive-foreground: #FFFFFF;
-  --color-border: #284761;
-  --color-input: #284761;
-  --color-ring: #C9AA68;
+  --color-border: #42463F;
+  --color-input: #42463F;
+  --color-ring: #C8AE72;
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
@@ -33,24 +33,36 @@
 
 @layer base {
   * { @apply border-border; }
-  body { @apply bg-background font-sans text-foreground antialiased; background-image: radial-gradient(circle at 95% 0%, rgba(185,151,87,.10), transparent 24rem); }
+  body { @apply bg-background font-sans text-foreground antialiased; background-image: radial-gradient(circle at 95% 0%, rgba(182,154,94,.08), transparent 24rem); }
   button, input, select, textarea { font: inherit; }
 }
 
 @layer utilities {
   .font-display { font-family: "Source Serif 4", Georgia, serif; }
-  .wij-card { @apply rounded-lg border border-[#284761] bg-[#102A45] shadow-[0_10px_28px_rgba(0,0,0,0.15)]; }
-  .wij-input { @apply h-10 w-full rounded-md border border-[#36546D] bg-[#0B2138] px-3 text-sm text-[#ECF2F7] outline-none transition placeholder:text-[#7F98AE] focus:border-[#C9AA68] focus:ring-2 focus:ring-[#C9AA68]/20; }
-  .institutional-kicker { @apply text-[10px] font-bold uppercase tracking-[0.18em] text-[#C9AA68]; }
-  .wij-card table thead { background: #0C2138 !important; }
-  .wij-card table thead th { color: #C9AA68 !important; font-weight: 700; letter-spacing: .1em; }
-  .wij-card table tbody tr { border-color: #284761 !important; }
-  .wij-card table tbody tr:hover { background: #153653 !important; }
-  .wij-card table td { color: #C7D4DE; }
+  .wij-card { @apply rounded-lg border border-[#42463F] bg-[#242724] shadow-[0_10px_28px_rgba(0,0,0,0.15)]; }
+  .wij-input { @apply h-10 w-full rounded-md border border-[#52584F] bg-[#202420] px-3 text-sm text-[#F1F0EA] outline-none transition placeholder:text-[#92968D] focus:border-[#C8AE72] focus:ring-2 focus:ring-[#C8AE72]/20; }
+  .institutional-kicker { @apply text-[10px] font-bold uppercase tracking-[0.18em] text-[#C8AE72]; }
+  .wij-card table thead { background: #1C201D !important; }
+  .wij-card table thead th { color: #C8AE72 !important; font-weight: 700; letter-spacing: .1em; }
+  .wij-card table tbody tr { border-color: #42463F !important; }
+  .wij-card table tbody tr:hover { background: #30352F !important; }
+  .wij-card table td { color: #D8D9D2; }
   .wij-card table td .font-semibold, .wij-card table td .font-display { color: #F5F1E9; }
   .wij-card select { border-radius: .375rem; }
   .wij-card [class*="bg-[#10B981]/15"], .wij-card [class*="bg-[#4F8EF7]/15"], .wij-card [class*="bg-[#7C3AED]/15"], .wij-card [class*="bg-[#F59E0B]/15"] { border: 1px solid rgba(201, 170, 104, .28); }
-  button[class*="bg-[#4F8EF7]"] { background-color: #B99757 !important; color: #07182B !important; }
-  button[class*="bg-[#4F8EF7]"]:hover { background-color: #C9AA68 !important; }
+  button[class*="bg-[#4F8EF7]"] { background-color: #B69A5E !important; color: #171A17 !important; }
+  button[class*="bg-[#4F8EF7]"]:hover { background-color: #C8AE72 !important; }
   .wij-card [class*="rounded-full"] { letter-spacing: .04em; }
+  [class*="bg-[#07182B]"], [class*="bg-[#0A1628]"] { background-color: #171A17 !important; }
+  [class*="bg-[#0C2138]"], [class*="bg-[#111E35]"] { background-color: #1C201D !important; }
+  [class*="bg-[#102A45]"], [class*="bg-[#1C2A4A]"] { background-color: #242724 !important; }
+  [class*="bg-[#183752]"], [class*="bg-[#162040]"] { background-color: #343A33 !important; }
+  [class*="bg-[#0B2138]"] { background-color: #202420 !important; }
+  [class*="border-[#284761]"], [class*="border-[#243356]"] { border-color: #42463F !important; }
+  [class*="text-[#9AAFC1]"], [class*="text-[#8898AA]"] { color: #B8BBB2 !important; }
+  [class*="text-[#75A7FF]"], [class*="text-[#B59AFF]"], [class*="text-[#45D6A6]"], [class*="text-[#F8C45E]"] { color: #D8BF86 !important; }
+  [class*="bg-[#4F8EF7]/15"], [class*="bg-[#7C3AED]/15"], [class*="bg-[#10B981]/15"], [class*="bg-[#F59E0B]/15"] { background-color: #343A33 !important; }
+  [class*="hover:bg-[#4F8EF7]/10"]:hover, [class*="hover:bg-[#7C3AED]/10"]:hover, [class*="hover:bg-[#10B981]/10"]:hover, [class*="hover:bg-[#F59E0B]/10"]:hover { background-color: #3E453D !important; }
+  [class*="text-[#F87171]"] { color: #D5A09A !important; }
+  [class*="bg-[#EF4444]/10"], [class*="bg-[#EF4444]/15"] { background-color: #432C2A !important; }
 }

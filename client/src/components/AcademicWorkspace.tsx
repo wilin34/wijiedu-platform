@@ -33,7 +33,7 @@ type GradeForm = { studentId: string; subjectId: string; period: string; title: 
 type ActivityForm = { subjectId: string; title: string; description: string; dueAt: string; maxScore: string; status: "draft" | "published" | "closed"; file: File | null };
 
 const blankStudent: StudentForm = { fullName: "", email: "", documentId: "", birthDate: "", phone: "", guardianName: "", status: "active" };
-const blankSubject: SubjectForm = { code: "", name: "", description: "", period: "", teacherId: "", color: "#4F8EF7", active: true, studentIds: [] };
+const blankSubject: SubjectForm = { code: "", name: "", description: "", period: "", teacherId: "", color: "#B69A5E", active: true, studentIds: [] };
 const blankGrade: GradeForm = { studentId: "", subjectId: "", period: "", title: "", score: "", maxScore: "100", notes: "" };
 const blankActivity: ActivityForm = { subjectId: "", title: "", description: "", dueAt: "", maxScore: "100", status: "draft", file: null };
 

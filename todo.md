@@ -52,3 +52,9 @@
 - [x] Ejecutar y registrar una comprobación autenticada verificable de las rutas internas del portal.
 - [x] Automatizar una prueba HTTP autenticada para las rutas internas del portal.
 - [x] Añadir una prueba versionada de acceso autenticado a materias, usuarios y recursos internos.
+- [x] Sustituir la paleta azul por tonos neutros institucionales y mantener el dorado como acento.
+- [x] Revisar contraste y consistencia visual de la paleta neutra en escritorio y móvil.
+- [x] Sustituir explícitamente los acentos azules y morados restantes de los módulos académicos por tonos neutros y dorados.
+- [x] Revisar visualmente dashboard, materias, usuarios, actividades y centro de aprendizaje con la paleta neutra en escritorio y móvil.
+- [x] Reemplazar directamente los colores intensos residuales en los componentes académicos sin depender de reglas globales.
+- [x] Corregir el error de ejecución del centro de aprendizaje y repetir la revisión visual autenticada.

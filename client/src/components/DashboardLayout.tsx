@@ -68,16 +68,16 @@ export default function DashboardLayout({
   const initials = (user.name || "U").slice(0, 1).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#07182B] text-[#ECF2F7]">
+    <div className="min-h-screen bg-[#171A17] text-[#F1F0EA]">
       {mobileOpen && <button className="fixed inset-0 z-30 bg-black/60 lg:hidden" aria-label="Cerrar menú" onClick={() => setMobileOpen(false)} />}
-      <aside className={cn("fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[#284761] bg-[#0C2138] transition-all duration-200", collapsed ? "w-[72px]" : "w-[268px]", mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0")}>
-        <div className="flex min-h-[78px] items-center gap-3 border-b border-[#284761] px-5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#B99757] text-[#07182B]"><GraduationCap className="h-5 w-5" /></div>
-          {!collapsed && <div className="min-w-0"><p className="font-display text-xl font-bold tracking-tight text-white">WijiEdu</p><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#C9AA68]">Gestión académica</p></div>}
+      <aside className={cn("fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[#42463F] bg-[#1C201D] transition-all duration-200", collapsed ? "w-[72px]" : "w-[268px]", mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0")}>
+        <div className="flex min-h-[78px] items-center gap-3 border-b border-[#42463F] px-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#B69A5E] text-[#171A17]"><GraduationCap className="h-5 w-5" /></div>
+          {!collapsed && <div className="min-w-0"><p className="font-display text-xl font-bold tracking-tight text-white">WijiEdu</p><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#C8AE72]">Gestión académica</p></div>}
         </div>
-        <button className="flex items-center gap-3 border-b border-[#284761] px-5 py-4 text-left transition hover:bg-[#102A45]" onClick={() => onNavigate("dashboard")}>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#183752] text-xs font-bold text-[#E3C584]">{initials}</span>
-          {!collapsed && <span className="min-w-0"><span className="block truncate text-sm font-semibold text-white">{user.name || "Usuario"}</span><span className="block truncate text-[11px] text-[#9AAFC1]">{roleLabel}</span></span>}
+        <button className="flex items-center gap-3 border-b border-[#42463F] px-5 py-4 text-left transition hover:bg-[#242724]" onClick={() => onNavigate("dashboard")}>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#343A33] text-xs font-bold text-[#E4D0A0]">{initials}</span>
+          {!collapsed && <span className="min-w-0"><span className="block truncate text-sm font-semibold text-white">{user.name || "Usuario"}</span><span className="block truncate text-[11px] text-[#B8BBB2]">{roleLabel}</span></span>}
         </button>
         <nav className="flex-1 overflow-y-auto px-3 py-5">
           {!collapsed && <p className="px-3 pb-3 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#C9AA68]">Navegación académica</p>}
