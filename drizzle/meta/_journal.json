@@ -50,6 +50,13 @@
       "when": 1787416217302,
       "tag": "0006_spooky_lester",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787418440300,
+      "tag": "0007_fixed_cassandra_nova",
+      "breakpoints": true
     }
   ]
 }

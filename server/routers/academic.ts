@@ -127,6 +127,56 @@ const detailedCourseProposal = z.object({
   modules: z.array(courseModuleInput).min(3).max(3),
 });
 
+const assessmentQuestionInput = z.object({
+  id: z.string().trim().min(1).max(60),
+  prompt: z.string().trim().min(12).max(1500),
+  options: z.array(z.string().trim().min(1).max(500)).length(4),
+  correctOption: z.number().int().min(0).max(3),
+  explanation: z.string().trim().min(20).max(1500),
+});
+
+const generatedAssessment = z.object({
+  title: z.string().trim().min(4).max(220),
+  description: z.string().trim().min(25).max(2000),
+  passingScore: z.number().int().min(50).max(100),
+  questions: z.array(assessmentQuestionInput).min(5).max(8),
+});
+
+function fallbackAssessment(module: { title: string; overview: string }) {
+  return {
+    title: `Evaluación de cierre · ${module.title}`,
+    description: `Cuestionario de cierre para comprobar la comprensión de los contenidos trabajados en ${module.title}.`,
+    passingScore: 70,
+    questions: [1, 2, 3, 4, 5].map(index => ({
+      id: `q${index}`,
+      prompt: `¿Cuál afirmación representa mejor un aprendizaje central del módulo ${module.title}?`,
+      options: ["Relacionar conceptos con situaciones reales", "Memorizar términos sin aplicarlos", "Evitar el análisis de casos", "Trabajar sin criterios de revisión"],
+      correctOption: 0,
+      explanation: `El módulo busca que los estudiantes comprendan y apliquen sus contenidos en contextos y situaciones reales.`,
+    })),
+  };
+}
+
+async function generateModuleAssessment(module: { title: string; overview: string; learningObjectives: string[]; lessons: Array<{ title: string; summary: string; keyTopics: string[] }> }) {
+  const lessonContext = module.lessons.map(lesson => `Clase: ${lesson.title}. Resumen: ${lesson.summary}. Temas: ${lesson.keyTopics.join(", ")}.`).join("\n");
+  const response = await invokeLLM({
+    model: "claude-haiku-4-5",
+    maxTokens: 4000,
+    messages: [
+      { role: "system", content: "Eres un docente experto en evaluación formativa. Responde únicamente JSON válido, en español, sin Markdown." },
+      { role: "user", content: `Crea una evaluación de cierre del módulo "${module.title}". Contexto: ${module.overview}. Objetivos: ${module.learningObjectives.join("; ")}. Contenidos:\n${lessonContext}\nDevuelve JSON con title, description, passingScore (70), y questions. Incluye exactamente 5 preguntas de opción múltiple con id, prompt, options (exactamente 4), correctOption (índice 0 a 3) y explanation. Evalúa comprensión y aplicación; evita preguntas ambiguas, trampas y contenido ajeno al módulo.` },
+    ],
+  });
+  const content = response.choices?.[0]?.message.content;
+  if (typeof content !== "string") return fallbackAssessment(module);
+  try {
+    const parsed = generatedAssessment.safeParse(JSON.parse(content));
+    return parsed.success ? parsed.data : fallbackAssessment(module);
+  } catch {
+    return fallbackAssessment(module);
+  }
+}
+
 async function generateDetailedCourseProposal(input: z.infer<typeof generatedCourseInput>) {
   const response = await invokeLLM({
     model: "claude-haiku-4-5",
@@ -363,6 +413,62 @@ export const academicRouter = router({
     modules: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, input.subjectId))) forbid("No tienes acceso al programa de esta materia.");
       return db.listCourseModulesForSubject(input.subjectId);
+    }),
+    assessments: protectedProcedure.input(z.object({ moduleId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const courseModule = await db.getCourseModuleById(input.moduleId);
+      if (!courseModule) throw new TRPCError({ code: "NOT_FOUND", message: "Módulo no encontrado." });
+      if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, courseModule.subjectId))) forbid("No tienes acceso a las evaluaciones de este módulo.");
+      const assessments = await db.listModuleAssessments(input.moduleId, isStaff(ctx.user));
+      return isStaff(ctx.user) ? assessments : assessments.filter(assessment => assessment.status === "published");
+    }),
+    generateAssessment: protectedProcedure.input(z.object({ moduleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const courseModule = await db.getCourseModuleById(input.moduleId);
+      if (!courseModule) throw new TRPCError({ code: "NOT_FOUND", message: "Módulo no encontrado." });
+      await assertSubjectManager(ctx.user, courseModule.subjectId);
+      const modules = await db.listCourseModulesForSubject(courseModule.subjectId);
+      const moduleDetail = modules.find(item => item.id === input.moduleId);
+      if (!moduleDetail) throw new TRPCError({ code: "NOT_FOUND", message: "No fue posible obtener los contenidos del módulo." });
+      const proposal = await generateModuleAssessment(moduleDetail);
+      return { id: await db.createModuleAssessment({ ...proposal, moduleId: input.moduleId, status: "published", createdBy: ctx.user.id }) };
+    }),
+    submitAssessment: protectedProcedure.input(z.object({ assessmentId: z.number().int().positive(), answers: z.array(z.object({ questionId: z.string().trim().min(1).max(60), selectedOption: z.number().int().min(0).max(3) })).min(1).max(8) })).mutation(async ({ ctx, input }) => {
+      if (isStaff(ctx.user)) forbid("Solo los estudiantes pueden resolver evaluaciones.");
+      const student = await ownStudent(ctx.user);
+      const assessment = await db.getModuleAssessmentById(input.assessmentId);
+      if (!assessment || assessment.status !== "published") throw new TRPCError({ code: "NOT_FOUND", message: "La evaluación no está disponible." });
+      const courseModule = await db.getCourseModuleById(assessment.moduleId);
+      if (!courseModule || !(await db.isStudentEnrolled(student.id, courseModule.subjectId))) forbid("No estás inscrito en la materia de esta evaluación.");
+      const answerMap = new Map(input.answers.map(answer => [answer.questionId, answer.selectedOption]));
+      const score = assessment.questions.reduce((total, question) => total + (answerMap.get(question.id) === question.correctOption ? 1 : 0), 0);
+      const maxScore = assessment.questions.length;
+      const percentage = Math.round((score / maxScore) * 100);
+      const passed = percentage >= assessment.passingScore;
+      const id = await db.createModuleAssessmentAttempt({ assessmentId: assessment.id, studentId: student.id, answers: input.answers, score, maxScore, passed });
+      return { id, score, maxScore, percentage, passed, passingScore: assessment.passingScore, review: assessment.questions.map(question => ({ questionId: question.id, correctOption: question.correctOption, explanation: question.explanation })) };
+    }),
+    progress: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, input.subjectId))) forbid("No tienes acceso al progreso de esta materia.");
+      if (isStaff(ctx.user)) return { isStudent: false, completedLessonIds: [], completedModuleIds: [], passedAssessmentIds: [], totalLessons: 0, completedLessons: 0, percentage: 0 };
+      const student = await ownStudent(ctx.user);
+      const modules = await db.listCourseModulesForSubject(input.subjectId);
+      const completedLessonIds = (await db.listCompletedLessonsForStudent(student.id, input.subjectId)).map(item => item.lessonId);
+      const assessmentLists = await Promise.all(modules.map(courseModule => db.listModuleAssessments(courseModule.id)));
+      const assessments = assessmentLists.flat().filter(assessment => assessment.status === "published");
+      const attempts = await db.listAssessmentAttemptsForStudent(student.id, assessments.map(assessment => assessment.id));
+      const passedAssessmentIds = Array.from(new Set(attempts.filter(attempt => attempt.passed === 1).map(attempt => attempt.assessmentId)));
+      const completedModuleIds = modules.filter(courseModule => courseModule.lessons.length > 0 && courseModule.lessons.every(lesson => completedLessonIds.includes(lesson.id))).map(courseModule => courseModule.id);
+      const totalLessons = modules.reduce((total, courseModule) => total + courseModule.lessons.length, 0);
+      return { isStudent: true, completedLessonIds, completedModuleIds, passedAssessmentIds, totalLessons, completedLessons: completedLessonIds.length, percentage: totalLessons ? Math.round((completedLessonIds.length / totalLessons) * 100) : 0 };
+    }),
+    setLessonProgress: protectedProcedure.input(z.object({ lessonId: z.number().int().positive(), completed: z.boolean() })).mutation(async ({ ctx, input }) => {
+      if (isStaff(ctx.user)) forbid("Solo los estudiantes pueden actualizar su avance.");
+      const student = await ownStudent(ctx.user);
+      const lesson = await db.getCourseLessonById(input.lessonId);
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lección no encontrada." });
+      const courseModule = await db.getCourseModuleById(lesson.moduleId);
+      if (!courseModule || !(await db.isStudentEnrolled(student.id, courseModule.subjectId))) forbid("No estás inscrito en la materia de esta lección.");
+      await db.setLessonCompletion({ ...input, studentId: student.id });
+      return { success: true };
     }),
     addResource: protectedProcedure.input(z.object({ subjectId: z.number().int().positive(), data: resourceInput })).mutation(async ({ ctx, input }) => {
       await assertSubjectManager(ctx.user, input.subjectId);

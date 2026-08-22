@@ -109,6 +109,41 @@ export const courseLessons = mysqlTable("course_lessons", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const moduleAssessments = mysqlTable("module_assessments", {
+  id: int("id").autoincrement().primaryKey(),
+  moduleId: int("moduleId").notNull(),
+  title: varchar("title", { length: 220 }).notNull(),
+  description: text("description").notNull(),
+  questions: text("questions").notNull(),
+  passingScore: int("passingScore").default(70).notNull(),
+  status: mysqlEnum("status", ["draft", "published"]).default("published").notNull(),
+  createdBy: int("createdBy").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const moduleAssessmentAttempts = mysqlTable("module_assessment_attempts", {
+  id: int("id").autoincrement().primaryKey(),
+  assessmentId: int("assessmentId").notNull(),
+  studentId: int("studentId").notNull(),
+  answers: text("answers").notNull(),
+  score: int("score").notNull(),
+  maxScore: int("maxScore").notNull(),
+  passed: int("passed").default(0).notNull(),
+  completedAt: timestamp("completedAt").defaultNow().notNull(),
+});
+
+export const lessonProgress = mysqlTable(
+  "lesson_progress",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    lessonId: int("lessonId").notNull(),
+    studentId: int("studentId").notNull(),
+    completedAt: timestamp("completedAt").defaultNow().notNull(),
+  },
+  table => ({ lessonStudentUnique: uniqueIndex("lesson_progress_lesson_student_unique").on(table.lessonId, table.studentId) })
+);
+
 export const enrollments = mysqlTable(
   "enrollments",
   {
@@ -213,5 +248,8 @@ export type CourseResource = typeof courseResources.$inferSelect;
 export type Competency = typeof competencies.$inferSelect;
 export type CourseModule = typeof courseModules.$inferSelect;
 export type CourseLesson = typeof courseLessons.$inferSelect;
+export type ModuleAssessment = typeof moduleAssessments.$inferSelect;
+export type ModuleAssessmentAttempt = typeof moduleAssessmentAttempts.$inferSelect;
+export type LessonProgress = typeof lessonProgress.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type LiveClass = typeof liveClasses.$inferSelect;

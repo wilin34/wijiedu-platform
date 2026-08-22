@@ -10,7 +10,10 @@ import {
   grades,
   InsertUser,
   liveClasses,
+  lessonProgress,
   messages,
+  moduleAssessmentAttempts,
+  moduleAssessments,
   students,
   subjects,
   submissions,
@@ -313,9 +316,16 @@ export async function deleteSubject(subjectId: number) {
   const activityIds = activityRows.map(row => row.id);
   const moduleRows = await db.select({ id: courseModules.id }).from(courseModules).where(eq(courseModules.subjectId, subjectId));
   const moduleIds = moduleRows.map(row => row.id);
+  const lessonRows = moduleIds.length ? await db.select({ id: courseLessons.id }).from(courseLessons).where(inArray(courseLessons.moduleId, moduleIds)) : [];
+  const lessonIds = lessonRows.map(row => row.id);
+  const assessmentRows = moduleIds.length ? await db.select({ id: moduleAssessments.id }).from(moduleAssessments).where(inArray(moduleAssessments.moduleId, moduleIds)) : [];
+  const assessmentIds = assessmentRows.map(row => row.id);
   if (activityIds.length) await db.delete(submissions).where(inArray(submissions.activityId, activityIds));
+  if (assessmentIds.length) await db.delete(moduleAssessmentAttempts).where(inArray(moduleAssessmentAttempts.assessmentId, assessmentIds));
+  if (lessonIds.length) await db.delete(lessonProgress).where(inArray(lessonProgress.lessonId, lessonIds));
   if (moduleIds.length) await db.delete(courseLessons).where(inArray(courseLessons.moduleId, moduleIds));
   await db.delete(activities).where(eq(activities.subjectId, subjectId));
+  if (moduleIds.length) await db.delete(moduleAssessments).where(inArray(moduleAssessments.moduleId, moduleIds));
   await db.delete(courseModules).where(eq(courseModules.subjectId, subjectId));
   await db.delete(courseResources).where(eq(courseResources.subjectId, subjectId));
   await db.delete(competencies).where(eq(competencies.subjectId, subjectId));
@@ -443,6 +453,85 @@ export async function listCourseModulesForSubject(subjectId: number) {
     learningObjectives: readStringArray(courseModule.learningObjectives),
     lessons: lessons.filter(lesson => lesson.moduleId === courseModule.id).map(lesson => ({ ...lesson, keyTopics: readStringArray(lesson.keyTopics) })),
   }));
+}
+
+export async function getCourseModuleById(moduleId: number) {
+  const db = await requireDb();
+  const result = await db.select().from(courseModules).where(eq(courseModules.id, moduleId)).limit(1);
+  return result[0];
+}
+
+export async function getCourseLessonById(lessonId: number) {
+  const db = await requireDb();
+  const result = await db.select().from(courseLessons).where(eq(courseLessons.id, lessonId)).limit(1);
+  return result[0];
+}
+
+type AssessmentQuestion = { id: string; prompt: string; options: string[]; correctOption: number; explanation: string };
+
+function readAssessmentQuestions(value: string): AssessmentQuestion[] {
+  try {
+    const questions = JSON.parse(value);
+    if (!Array.isArray(questions)) return [];
+    return questions.filter(question => typeof question?.id === "string" && typeof question?.prompt === "string" && Array.isArray(question?.options) && Number.isInteger(question?.correctOption) && typeof question?.explanation === "string");
+  } catch {
+    return [];
+  }
+}
+
+export async function createModuleAssessment(input: { moduleId: number; title: string; description: string; questions: AssessmentQuestion[]; passingScore: number; status: "draft" | "published"; createdBy: number }) {
+  const db = await requireDb();
+  const result = await db.insert(moduleAssessments).values({ ...input, questions: JSON.stringify(input.questions) });
+  return Number(result[0].insertId);
+}
+
+export async function listModuleAssessments(moduleId: number, includeAnswers = false) {
+  const db = await requireDb();
+  const assessments = await db.select().from(moduleAssessments).where(eq(moduleAssessments.moduleId, moduleId)).orderBy(desc(moduleAssessments.createdAt));
+  return assessments.map(assessment => ({
+    ...assessment,
+    questions: readAssessmentQuestions(assessment.questions).map(question => includeAnswers ? question : { id: question.id, prompt: question.prompt, options: question.options }),
+  }));
+}
+
+export async function getModuleAssessmentById(assessmentId: number) {
+  const db = await requireDb();
+  const assessment = (await db.select().from(moduleAssessments).where(eq(moduleAssessments.id, assessmentId)).limit(1))[0];
+  if (!assessment) return undefined;
+  return {
+    ...assessment,
+    questions: readAssessmentQuestions(assessment.questions),
+  };
+}
+
+export async function createModuleAssessmentAttempt(input: { assessmentId: number; studentId: number; answers: Array<{ questionId: string; selectedOption: number }>; score: number; maxScore: number; passed: boolean }) {
+  const db = await requireDb();
+  const result = await db.insert(moduleAssessmentAttempts).values({ ...input, answers: JSON.stringify(input.answers), passed: input.passed ? 1 : 0 });
+  return Number(result[0].insertId);
+}
+
+export async function listAssessmentAttemptsForStudent(studentId: number, assessmentIds: number[]) {
+  if (!assessmentIds.length) return [];
+  const db = await requireDb();
+  return db.select().from(moduleAssessmentAttempts).where(and(eq(moduleAssessmentAttempts.studentId, studentId), inArray(moduleAssessmentAttempts.assessmentId, assessmentIds))).orderBy(desc(moduleAssessmentAttempts.completedAt));
+}
+
+export async function setLessonCompletion(input: { lessonId: number; studentId: number; completed: boolean }) {
+  const db = await requireDb();
+  if (!input.completed) {
+    await db.delete(lessonProgress).where(and(eq(lessonProgress.lessonId, input.lessonId), eq(lessonProgress.studentId, input.studentId)));
+    return;
+  }
+  await db.insert(lessonProgress).values({ lessonId: input.lessonId, studentId: input.studentId }).onDuplicateKeyUpdate({ set: { completedAt: new Date() } });
+}
+
+export async function listCompletedLessonsForStudent(studentId: number, subjectId: number) {
+  const db = await requireDb();
+  return db.select({ lessonId: lessonProgress.lessonId, completedAt: lessonProgress.completedAt })
+    .from(lessonProgress)
+    .innerJoin(courseLessons, eq(courseLessons.id, lessonProgress.lessonId))
+    .innerJoin(courseModules, eq(courseModules.id, courseLessons.moduleId))
+    .where(and(eq(lessonProgress.studentId, studentId), eq(courseModules.subjectId, subjectId)));
 }
 
 export async function listMessageRecipients(subjectId: number) {

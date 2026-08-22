@@ -39,6 +39,15 @@ const dbMocks = {
   updateLiveClass: vi.fn(async () => undefined),
   deleteLiveClass: vi.fn(async () => undefined),
   listCourseModulesForSubject: vi.fn(async () => [{ id: 71, subjectId: 7, title: "Módulo de prueba", learningObjectives: ["Aplicar conceptos"], lessons: [{ id: 72, title: "Clase de prueba", keyTopics: ["Tema"] }] }]),
+  getCourseModuleById: vi.fn(async () => ({ id: 71, subjectId: 7, title: "Módulo de prueba", overview: "Contenido de prueba" })),
+  getCourseLessonById: vi.fn(async () => ({ id: 72, moduleId: 71 })),
+  listModuleAssessments: vi.fn(async () => [{ id: 81, moduleId: 71, title: "Evaluación", description: "Comprueba conceptos.", questions: [{ id: "q1", prompt: "Pregunta", options: ["Correcta", "B", "C", "D"] }], passingScore: 70, status: "published" }]),
+  getModuleAssessmentById: vi.fn(async () => ({ id: 81, moduleId: 71, title: "Evaluación", description: "Comprueba conceptos.", questions: [{ id: "q1", prompt: "Pregunta", options: ["Correcta", "B", "C", "D"], correctOption: 0, explanation: "La opción correcta aplica el concepto." }], passingScore: 70, status: "published" })),
+  createModuleAssessment: vi.fn(async () => 81),
+  createModuleAssessmentAttempt: vi.fn(async () => 91),
+  listAssessmentAttemptsForStudent: vi.fn(async () => [{ id: 91, assessmentId: 81, studentId: 5, passed: 1 }]),
+  setLessonCompletion: vi.fn(async () => undefined),
+  listCompletedLessonsForStudent: vi.fn(async () => [{ lessonId: 72, completedAt: new Date() }]),
 };
 
 vi.mock("./db", () => dbMocks);
@@ -120,6 +129,18 @@ describe("router académico", () => {
     await expect(student.academic.curriculum.modules({ subjectId: 7 })).resolves.toHaveLength(1);
     expect(dbMocks.listCourseModulesForSubject).toHaveBeenCalledWith(7);
     await expect(student.academic.ai.createGeneratedCourse({ topic: "Economía aplicada", level: "intermediate", period: "2026-1" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("permite al estudiante resolver evaluaciones y registrar avance sin exponer respuestas correctas", async () => {
+    const student = appRouter.createCaller(context("student", 5));
+    const assessments = await student.academic.curriculum.assessments({ moduleId: 71 });
+    expect(assessments[0].questions[0]).not.toHaveProperty("correctOption");
+    await expect(student.academic.curriculum.setLessonProgress({ lessonId: 72, completed: true })).resolves.toEqual({ success: true });
+    expect(dbMocks.setLessonCompletion).toHaveBeenCalledWith({ lessonId: 72, studentId: 5, completed: true });
+    await expect(student.academic.curriculum.submitAssessment({ assessmentId: 81, answers: [{ questionId: "q1", selectedOption: 0 }] })).resolves.toMatchObject({ id: 91, score: 1, maxScore: 1, percentage: 100, passed: true });
+    const progress = await student.academic.curriculum.progress({ subjectId: 7 });
+    expect(progress).toMatchObject({ isStudent: true, completedLessons: 1, totalLessons: 1, percentage: 100, completedModuleIds: [71], passedAssessmentIds: [81] });
+    await expect(student.academic.curriculum.generateAssessment({ moduleId: 71 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("reserva la publicación de clases de Meet para administración y permite su consulta al estudiante", async () => {

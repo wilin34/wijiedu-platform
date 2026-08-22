@@ -71,3 +71,11 @@
 - [x] Crear una página de detalle al abrir una materia con su programa, módulos y contenidos.
 - [x] Incorporar imágenes educativas apropiadas en la presentación de los módulos.
 - [x] Verificar creación con IA, acceso por roles y visualización detallada de la materia.
+- [x] Modelar evaluaciones de cierre de módulo, preguntas, intentos y resultados por estudiante.
+- [x] Generar cuestionarios y actividades evaluables mediante IA a partir del contenido del módulo.
+- [x] Persistir el avance de módulos y lecciones por estudiante con controles de acceso.
+- [x] Incorporar resolución de cuestionarios y marcación de lecciones completadas para estudiantes.
+- [x] Mostrar una barra y estados visuales de progreso dentro de cada materia.
+- [x] Verificar generación, respuestas, permisos y cálculo de progreso académico.
+- [x] Generar y descargar un PDF institucional con el plan completo de cada materia.
+- [x] Verificar permisos, contenido y descarga del PDF curricular.
