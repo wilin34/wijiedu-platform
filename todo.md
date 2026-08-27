@@ -93,3 +93,12 @@
 - [x] Completar la limpieza de evaluaciones y referencias de autoría al eliminar una cuenta de usuario.
 - [x] Verificar mediante pruebas que la eliminación sane todas las referencias académicas dependientes.
 - [x] Ampliar la prueba de integración para cubrir recursos, clases en vivo, mensajes, entregas y perfiles estudiantiles al eliminar una cuenta.
+- [ ] Definir productos académicos y planes de suscripción cobrables mediante Stripe.
+- [ ] Preparar la integración segura de Stripe y sus variables de entorno.
+- [ ] Implementar catálogo, inicio de pago y estados de suscripción en el portal.
+- [ ] Probar en modo seguro los pagos, suscripciones y permisos comerciales.
+- [x] Investigar y curar recursos educativos verificables para el curso de Inversiones.
+- [x] Crear una materia de Inversiones de 40 horas con competencias, módulos y lecciones detalladas.
+- [x] Incorporar actividades evaluables y recursos de video, PDF y lectura al curso de Inversiones.
+- [x] Verificar la publicación, estructura y visualización del nuevo curso.
+- [x] Confirmar mediante una sesión autenticada la consulta y presentación del curso INV-401.
