@@ -10,6 +10,8 @@ vi.mock("@/lib/trpc", () => ({
     localAuth: {
       register: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) },
       login: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) },
+      requestPasswordReset: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) },
+      resetPassword: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) },
     },
   },
 }));

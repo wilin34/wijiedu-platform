@@ -20,7 +20,7 @@ function getTokenFromRequest(req: Request) {
 }
 
 export async function createLocalSession(user: User) {
-  return new SignJWT({ role: user.role, loginMethod: "local" })
+  return new SignJWT({ role: user.role, loginMethod: "local", sessionVersion: user.sessionVersion })
     .setProtectedHeader({ alg: "HS256", typ: LOCAL_SESSION_TYPE })
     .setSubject(String(user.id))
     .setIssuedAt()
@@ -38,5 +38,7 @@ export async function authenticateLocalSession(req: Request): Promise<User | nul
   if (!Number.isSafeInteger(userId) || userId <= 0) throw new Error("Invalid local session subject");
   const user = await getUserById(userId);
   if (!user || user.loginMethod !== "local") throw new Error("Local session user not found");
+  const sessionVersion = Number(payload.sessionVersion ?? 0);
+  if (!Number.isInteger(sessionVersion) || sessionVersion !== user.sessionVersion) throw new Error("Local session expired");
   return user;
 }

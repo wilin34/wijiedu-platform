@@ -1,6 +1,6 @@
 import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { z } from "zod";
 import * as db from "./db";
@@ -30,6 +30,13 @@ async function passwordMatches(password: string, savedHash: string) {
   const expected = Buffer.from(saved, "hex");
   return expected.length === derived.length && timingSafeEqual(expected, derived);
 }
+
+function hashResetToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+const RESET_COOKIE_NAME = "wijiedu_password_reset";
+const resetMessage = "Si el correo corresponde a una cuenta, se generó un enlace de recuperación de un solo uso.";
 
 function publicUser(user: NonNullable<Awaited<ReturnType<typeof db.getUserById>>>) {
   return { id: user.id, name: user.name, email: user.email, role: user.role };
@@ -65,6 +72,22 @@ export const appRouter = router({
       await db.updateLastSignedIn(user.id);
       ctx.res.cookie(COOKIE_NAME, await createLocalSession(user), { ...getSessionCookieOptions(ctx.req), maxAge: 7 * 24 * 60 * 60 * 1000 });
       return publicUser(user);
+    }),
+    requestPasswordReset: publicProcedure.input(z.object({ email: z.string().trim().toLowerCase().email().max(320) })).mutation(async ({ ctx, input }) => {
+      const user = await db.getUserByEmail(input.email);
+      const token = randomBytes(32).toString("base64url");
+      if (user?.passwordHash) await db.createPasswordResetToken(user.id, hashResetToken(token), new Date(Date.now() + 30 * 60 * 1000));
+      ctx.res.cookie(RESET_COOKIE_NAME, token, { httpOnly: true, secure: ctx.req.protocol === "https", sameSite: "lax", maxAge: 30 * 60 * 1000, path: "/" });
+      return { message: resetMessage };
+    }),
+    resetPassword: publicProcedure.input(z.object({ password: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+      const token = ctx.req.headers.cookie?.split(";").map(value => value.trim()).find(value => value.startsWith(`${RESET_COOKIE_NAME}=`))?.slice(RESET_COOKIE_NAME.length + 1);
+      const record = token ? await db.getValidPasswordResetToken(hashResetToken(decodeURIComponent(token))) : undefined;
+      if (!record || record.expiresAt.getTime() <= Date.now()) throw new TRPCError({ code: "BAD_REQUEST", message: "El enlace de recuperación no es válido o ya expiró." });
+      await db.updateAccountPassword(record.userId, await hashPassword(input.password));
+      await db.markPasswordResetTokenUsed(record.id);
+      ctx.res.clearCookie(RESET_COOKIE_NAME, { httpOnly: true, secure: ctx.req.protocol === "https", sameSite: "lax", path: "/" });
+      return { success: true, message: "Contraseña actualizada. Ya puedes ingresar al portal." };
     }),
   }),
   academic: academicRouter,

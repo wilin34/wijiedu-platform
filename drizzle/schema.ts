@@ -18,6 +18,7 @@ export const users = mysqlTable(
     email: varchar("email", { length: 320 }),
     loginMethod: varchar("loginMethod", { length: 64 }),
     passwordHash: varchar("passwordHash", { length: 255 }),
+    sessionVersion: int("sessionVersion").default(0).notNull(),
     role: mysqlEnum("role", ["admin", "teacher", "student", "user"]).default("student").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -253,3 +254,17 @@ export type ModuleAssessmentAttempt = typeof moduleAssessmentAttempts.$inferSele
 export type LessonProgress = typeof lessonProgress.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type LiveClass = typeof liveClasses.$inferSelect;
+
+
+export const passwordResetTokens = mysqlTable(
+  "password_reset_tokens",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("user_id").notNull(),
+    tokenHash: varchar("token_hash", { length: 128 }).notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  table => ({ tokenHashUnique: uniqueIndex("password_reset_tokens_hash_unique").on(table.tokenHash) })
+);

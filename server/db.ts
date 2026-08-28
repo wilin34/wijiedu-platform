@@ -1,4 +1,4 @@
-import { and, avg, count, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, avg, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   activities,
@@ -14,6 +14,7 @@ import {
   messages,
   moduleAssessmentAttempts,
   moduleAssessments,
+  passwordResetTokens,
   students,
   subjects,
   submissions,
@@ -882,4 +883,27 @@ export async function getDashboardStats(user: { id: number; role: string; email?
   const [activityTotal] = await db.select({ value: count() }).from(activities).innerJoin(enrollments, eq(enrollments.subjectId, activities.subjectId)).where(and(eq(enrollments.studentId, student.id), eq(activities.status, "published")));
   const [average] = await db.select({ value: avg(grades.score) }).from(grades).where(eq(grades.studentId, student.id));
   return { students: 1, subjects: Number(subjectTotal?.value ?? 0), activities: Number(activityTotal?.value ?? 0), average: Number(average?.value ?? 0) };
+}
+
+
+
+export async function createPasswordResetToken(userId: number, tokenHash: string, expiresAt: Date) {
+  const db = await requireDb();
+  await db.insert(passwordResetTokens).values({ userId, tokenHash, expiresAt });
+}
+
+export async function getValidPasswordResetToken(tokenHash: string) {
+  const db = await requireDb();
+  const result = await db.select().from(passwordResetTokens).where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt))).limit(1);
+  return result[0];
+}
+
+export async function markPasswordResetTokenUsed(tokenId: number) {
+  const db = await requireDb();
+  await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, tokenId));
+}
+
+export async function updateAccountPassword(userId: number, passwordHash: string) {
+  const db = await requireDb();
+  await db.update(users).set({ passwordHash, sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId));
 }
