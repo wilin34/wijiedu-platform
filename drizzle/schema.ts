@@ -268,3 +268,30 @@ export const passwordResetTokens = mysqlTable(
   },
   table => ({ tokenHashUnique: uniqueIndex("password_reset_tokens_hash_unique").on(table.tokenHash) })
 );
+
+
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("type", ["academic", "assessment", "live_class", "message", "system"]).default("system").notNull(),
+  title: varchar("title", { length: 220 }).notNull(),
+  message: text("message").notNull(),
+  href: varchar("href", { length: 512 }),
+  readAt: timestamp("readAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const notificationPreferences = mysqlTable(
+  "notification_preferences",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    academicEnabled: int("academicEnabled").default(1).notNull(),
+    assessmentEnabled: int("assessmentEnabled").default(1).notNull(),
+    liveClassEnabled: int("liveClassEnabled").default(1).notNull(),
+    messageEnabled: int("messageEnabled").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({ userUnique: uniqueIndex("notification_preferences_user_unique").on(table.userId) })
+);

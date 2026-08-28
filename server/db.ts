@@ -14,6 +14,8 @@ import {
   messages,
   moduleAssessmentAttempts,
   moduleAssessments,
+  notificationPreferences,
+  notifications,
   passwordResetTokens,
   students,
   subjects,
@@ -514,6 +516,10 @@ function readAssessmentQuestions(value: string): AssessmentQuestion[] {
 export async function createModuleAssessment(input: { moduleId: number; title: string; description: string; questions: AssessmentQuestion[]; passingScore: number; status: "draft" | "published"; createdBy: number }) {
   const db = await requireDb();
   const result = await db.insert(moduleAssessments).values({ ...input, questions: JSON.stringify(input.questions) });
+  if (input.status === "published") {
+    const [module] = await db.select({ subjectId: courseModules.subjectId }).from(courseModules).where(eq(courseModules.id, input.moduleId)).limit(1);
+    if (module) await notifySubjectStudents(module.subjectId, "assessment", "Nueva evaluación disponible", input.title, `/materias/${module.subjectId}`);
+  }
   return Number(result[0].insertId);
 }
 
@@ -588,6 +594,7 @@ export async function listMessagesForUser(subjectId: number, userId: number) {
 export async function createMessage(input: { subjectId: number; senderId: number; recipientId: number; body: string }) {
   const db = await requireDb();
   const result = await db.insert(messages).values(input);
+  await notifyUserIfEnabled(input.recipientId, "message", "Nuevo mensaje académico", "Has recibido un mensaje de tu docente o estudiante.", `/materias/${input.subjectId}`);
   return Number(result[0].insertId);
 }
 
@@ -646,6 +653,7 @@ export async function createActivity(input: {
 }) {
   const db = await requireDb();
   const result = await db.insert(activities).values(input);
+  if (input.status === "published") await notifySubjectStudents(input.subjectId, "academic", "Nueva actividad publicada", input.title, `/materias/${input.subjectId}`);
   return Number(result[0].insertId);
 }
 
@@ -662,7 +670,9 @@ export async function updateActivity(
   }
 ) {
   const db = await requireDb();
+  const [existing] = await db.select({ subjectId: activities.subjectId, title: activities.title, status: activities.status }).from(activities).where(eq(activities.id, activityId)).limit(1);
   await db.update(activities).set(input).where(eq(activities.id, activityId));
+  if (existing && input.status === "published" && existing.status !== "published") await notifySubjectStudents(existing.subjectId, "academic", "Nueva actividad publicada", input.title, `/materias/${existing.subjectId}`);
 }
 
 export async function deleteActivity(activityId: number) {
@@ -841,6 +851,7 @@ export async function createLiveClass(input: {
 }) {
   const db = await requireDb();
   const result = await db.insert(liveClasses).values(input);
+  if (input.status === "published") await notifySubjectStudents(input.subjectId, "live_class", "Nueva clase en vivo", input.title, `/clases-en-vivo`);
   return Number(result[0].insertId);
 }
 
@@ -853,12 +864,66 @@ export async function updateLiveClass(id: number, input: {
   status: "draft" | "published" | "completed" | "cancelled";
 }) {
   const db = await requireDb();
+  const [existing] = await db.select({ subjectId: liveClasses.subjectId, title: liveClasses.title, status: liveClasses.status }).from(liveClasses).where(eq(liveClasses.id, id)).limit(1);
   await db.update(liveClasses).set(input).where(eq(liveClasses.id, id));
+  if (existing && input.status === "published" && existing.status !== "published") await notifySubjectStudents(existing.subjectId, "live_class", "Nueva clase en vivo", input.title, `/clases-en-vivo`);
 }
 
 export async function deleteLiveClass(id: number) {
   const db = await requireDb();
   await db.delete(liveClasses).where(eq(liveClasses.id, id));
+}
+
+export async function listNotificationsForUser(userId: number, limit = 30) {
+  const db = await requireDb();
+  return db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(limit);
+}
+
+export async function countUnreadNotifications(userId: number) {
+  const db = await requireDb();
+  const [result] = await db.select({ value: count() }).from(notifications).where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+  return Number(result?.value ?? 0);
+}
+
+export async function markNotificationRead(userId: number, notificationId: number) {
+  const db = await requireDb();
+  await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
+}
+
+export async function markAllNotificationsRead(userId: number) {
+  const db = await requireDb();
+  await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+}
+
+export async function createNotification(input: { userId: number; type: "academic" | "assessment" | "live_class" | "message" | "system"; title: string; message: string; href?: string | null }) {
+  const db = await requireDb();
+  const result = await db.insert(notifications).values(input);
+  return Number(result[0].insertId);
+}
+
+async function notifyUserIfEnabled(userId: number, type: "academic" | "assessment" | "live_class" | "message", title: string, message: string, href: string) {
+  const preferences = await getNotificationPreferences(userId);
+  const enabled = type === "academic" ? preferences.academicEnabled : type === "assessment" ? preferences.assessmentEnabled : type === "live_class" ? preferences.liveClassEnabled : preferences.messageEnabled;
+  if (enabled) await createNotification({ userId, type, title, message, href });
+}
+
+async function notifySubjectStudents(subjectId: number, type: "academic" | "assessment" | "live_class", title: string, message: string, href: string) {
+  const recipients = await listMessageRecipients(subjectId);
+  await Promise.all(recipients.filter(recipient => recipient.role === "student").map(recipient => notifyUserIfEnabled(recipient.id, type, title, message, href)));
+}
+
+export async function getNotificationPreferences(userId: number) {
+  const db = await requireDb();
+  const [existing] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId)).limit(1);
+  if (existing) return existing;
+  await db.insert(notificationPreferences).values({ userId });
+  const [created] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId)).limit(1);
+  return created;
+}
+
+export async function updateNotificationPreferences(userId: number, input: { academicEnabled: number; assessmentEnabled: number; liveClassEnabled: number; messageEnabled: number }) {
+  const db = await requireDb();
+  await db.insert(notificationPreferences).values({ userId, ...input }).onDuplicateKeyUpdate({ set: input });
 }
 
 export async function getDashboardStats(user: { id: number; role: string; email?: string | null }) {

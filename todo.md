@@ -170,9 +170,11 @@ No se deben registrar contraseñas ni tokens en texto plano en respuestas, logs 
 
 ## Notificaciones personalizadas
 
-- [ ] Diseñar notificaciones personalizadas por rol y evento académico.
-- [ ] Persistir y mostrar notificaciones dentro del portal.
-- [ ] Verificar preferencias y lectura de notificaciones.
+- [x] Diseñar notificaciones personalizadas por rol y evento académico.
+- [x] Persistir y mostrar notificaciones dentro del portal.
+- [x] Verificar preferencias y lectura de notificaciones.
+- [x] Disparar notificaciones automáticas al publicar actividades, evaluaciones y clases en vivo, y al enviar mensajes.
+- [x] Hacer navegables los avisos y marcar como leídos los avisos abiertos o seleccionados.
 
 ## Curso de Inversiones: recursos
 
