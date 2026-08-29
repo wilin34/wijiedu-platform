@@ -425,14 +425,14 @@ export const academicRouter = router({
       return db.listCourseModulesForSubject(input.subjectId);
     }),
     assessments: protectedProcedure.input(z.object({ moduleId: z.number().int().positive() })).query(async ({ ctx, input }) => {
-      const courseModule = await db.getCourseModuleById(input.moduleId);
+      const courseModule = await db.getCourseModuleById(input.moduleId, ctx.institutionId ?? 1);
       if (!courseModule) throw new TRPCError({ code: "NOT_FOUND", message: "Módulo no encontrado." });
       if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, courseModule.subjectId))) forbid("No tienes acceso a las evaluaciones de este módulo.");
       const assessments = await db.listModuleAssessments(input.moduleId, isStaff(ctx.user));
       return isStaff(ctx.user) ? assessments : assessments.filter(assessment => assessment.status === "published");
     }),
     generateAssessment: protectedProcedure.input(z.object({ moduleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
-      const courseModule = await db.getCourseModuleById(input.moduleId);
+      const courseModule = await db.getCourseModuleById(input.moduleId, ctx.institutionId ?? 1);
       if (!courseModule) throw new TRPCError({ code: "NOT_FOUND", message: "Módulo no encontrado." });
       await assertSubjectManager(ctx.user, courseModule.subjectId, ctx.institutionId ?? 1);
       const modules = await db.listCourseModulesForSubject(courseModule.subjectId);
@@ -444,9 +444,9 @@ export const academicRouter = router({
     submitAssessment: protectedProcedure.input(z.object({ assessmentId: z.number().int().positive(), answers: z.array(z.object({ questionId: z.string().trim().min(1).max(60), selectedOption: z.number().int().min(0).max(3) })).min(1).max(8) })).mutation(async ({ ctx, input }) => {
       if (isStaff(ctx.user)) forbid("Solo los estudiantes pueden resolver evaluaciones.");
       const student = await ownStudent(ctx.user, ctx.institutionId ?? 1);
-      const assessment = await db.getModuleAssessmentById(input.assessmentId);
+      const assessment = await db.getModuleAssessmentById(input.assessmentId, ctx.institutionId ?? 1);
       if (!assessment || assessment.status !== "published") throw new TRPCError({ code: "NOT_FOUND", message: "La evaluación no está disponible." });
-      const courseModule = await db.getCourseModuleById(assessment.moduleId);
+      const courseModule = await db.getCourseModuleById(assessment.moduleId, ctx.institutionId ?? 1);
       if (!courseModule || !(await db.isStudentEnrolled(student.id, courseModule.subjectId))) forbid("No estás inscrito en la materia de esta evaluación.");
       const answerMap = new Map(input.answers.map(answer => [answer.questionId, answer.selectedOption]));
       const score = assessment.questions.reduce((total, question) => total + (answerMap.get(question.id) === question.correctOption ? 1 : 0), 0);
@@ -473,9 +473,9 @@ export const academicRouter = router({
     setLessonProgress: protectedProcedure.input(z.object({ lessonId: z.number().int().positive(), completed: z.boolean() })).mutation(async ({ ctx, input }) => {
       if (isStaff(ctx.user)) forbid("Solo los estudiantes pueden actualizar su avance.");
       const student = await ownStudent(ctx.user, ctx.institutionId ?? 1);
-      const lesson = await db.getCourseLessonById(input.lessonId);
+      const lesson = await db.getCourseLessonById(input.lessonId, ctx.institutionId ?? 1);
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lección no encontrada." });
-      const courseModule = await db.getCourseModuleById(lesson.moduleId);
+      const courseModule = await db.getCourseModuleById(lesson.moduleId, ctx.institutionId ?? 1);
       if (!courseModule || !(await db.isStudentEnrolled(student.id, courseModule.subjectId))) forbid("No estás inscrito en la materia de esta lección.");
       await db.setLessonCompletion({ ...input, studentId: student.id });
       return { success: true };

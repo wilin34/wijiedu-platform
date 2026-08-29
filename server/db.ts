@@ -549,16 +549,16 @@ export async function listCourseModulesForSubject(subjectId: number) {
   }));
 }
 
-export async function getCourseModuleById(moduleId: number) {
+export async function getCourseModuleById(moduleId: number, institutionId = 1) {
   const db = await requireDb();
-  const result = await db.select().from(courseModules).where(eq(courseModules.id, moduleId)).limit(1);
+  const result = await db.select().from(courseModules).where(and(eq(courseModules.id, moduleId), eq(courseModules.institutionId, institutionId))).limit(1);
   return result[0];
 }
 
-export async function getCourseLessonById(lessonId: number) {
+export async function getCourseLessonById(lessonId: number, institutionId = 1) {
   const db = await requireDb();
-  const result = await db.select().from(courseLessons).where(eq(courseLessons.id, lessonId)).limit(1);
-  return result[0];
+  const result = await db.select({ lesson: courseLessons }).from(courseLessons).innerJoin(courseModules, eq(courseModules.id, courseLessons.moduleId)).where(and(eq(courseLessons.id, lessonId), eq(courseLessons.institutionId, institutionId), eq(courseModules.institutionId, institutionId))).limit(1);
+  return result[0]?.lesson;
 }
 
 type AssessmentQuestion = { id: string; prompt: string; options: string[]; correctOption: number; explanation: string };
@@ -592,9 +592,9 @@ export async function listModuleAssessments(moduleId: number, includeAnswers = f
   }));
 }
 
-export async function getModuleAssessmentById(assessmentId: number) {
+export async function getModuleAssessmentById(assessmentId: number, institutionId = 1) {
   const db = await requireDb();
-  const assessment = (await db.select().from(moduleAssessments).where(eq(moduleAssessments.id, assessmentId)).limit(1))[0];
+  const assessment = (await db.select().from(moduleAssessments).where(and(eq(moduleAssessments.id, assessmentId), eq(moduleAssessments.institutionId, institutionId))).limit(1))[0];
   if (!assessment) return undefined;
   return {
     ...assessment,
