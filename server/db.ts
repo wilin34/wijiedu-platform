@@ -231,9 +231,9 @@ export async function listStudentsForTeacher(teacherId: number, institutionId = 
     .orderBy(desc(students.createdAt));
 }
 
-export async function getStudentById(studentId: number) {
+export async function getStudentById(studentId: number, institutionId = 1) {
   const db = await requireDb();
-  const result = await db.select().from(students).where(eq(students.id, studentId)).limit(1);
+  const result = await db.select().from(students).where(and(eq(students.id, studentId), eq(students.institutionId, institutionId))).limit(1);
   return result[0];
 }
 
@@ -268,6 +268,7 @@ export async function createStudent(input: {
 
 export async function updateStudent(
   studentId: number,
+  institutionId = 1,
   input: {
     fullName: string;
     email: string;
@@ -282,15 +283,15 @@ export async function updateStudent(
   await db
     .update(students)
     .set({ ...input, birthDate: input.birthDate ? new Date(input.birthDate) : null })
-    .where(eq(students.id, studentId));
+    .where(and(eq(students.id, studentId), eq(students.institutionId, institutionId)));
 }
 
-export async function deleteStudent(studentId: number) {
+export async function deleteStudent(studentId: number, institutionId = 1) {
   const db = await requireDb();
   await db.delete(enrollments).where(eq(enrollments.studentId, studentId));
   await db.delete(grades).where(eq(grades.studentId, studentId));
   await db.delete(submissions).where(eq(submissions.studentId, studentId));
-  await db.delete(students).where(eq(students.id, studentId));
+  await db.delete(students).where(and(eq(students.id, studentId), eq(students.institutionId, institutionId)));
 }
 
 export async function listSubjectsForUser(user: { id: number; role: string; email?: string | null; institutionId?: number }) {
@@ -383,6 +384,7 @@ export async function createSubjectWithCurriculum(input: {
 
 export async function updateSubject(
   subjectId: number,
+  institutionId = 1,
   input: {
     code: string;
     name: string;
@@ -394,10 +396,10 @@ export async function updateSubject(
   }
 ) {
   const db = await requireDb();
-  await db.update(subjects).set({ ...input, active: input.active ? 1 : 0 }).where(eq(subjects.id, subjectId));
+  await db.update(subjects).set({ ...input, active: input.active ? 1 : 0 }).where(and(eq(subjects.id, subjectId), eq(subjects.institutionId, institutionId)));
 }
 
-export async function deleteSubject(subjectId: number) {
+export async function deleteSubject(subjectId: number, institutionId = 1) {
   const db = await requireDb();
   const activityRows = await db.select({ id: activities.id }).from(activities).where(eq(activities.subjectId, subjectId));
   const activityIds = activityRows.map(row => row.id);
@@ -411,7 +413,7 @@ export async function deleteSubject(subjectId: number) {
   if (assessmentIds.length) await db.delete(moduleAssessmentAttempts).where(inArray(moduleAssessmentAttempts.assessmentId, assessmentIds));
   if (lessonIds.length) await db.delete(lessonProgress).where(inArray(lessonProgress.lessonId, lessonIds));
   if (moduleIds.length) await db.delete(courseLessons).where(inArray(courseLessons.moduleId, moduleIds));
-  await db.delete(activities).where(eq(activities.subjectId, subjectId));
+  await db.delete(activities).where(and(eq(activities.subjectId, subjectId), eq(activities.institutionId, institutionId)));
   if (moduleIds.length) await db.delete(moduleAssessments).where(inArray(moduleAssessments.moduleId, moduleIds));
   await db.delete(courseModules).where(eq(courseModules.subjectId, subjectId));
   await db.delete(courseResources).where(eq(courseResources.subjectId, subjectId));
@@ -693,9 +695,9 @@ export async function listActivitiesForUser(user: { id: number; role: string; em
     .orderBy(desc(activities.createdAt));
 }
 
-export async function getActivityById(activityId: number) {
+export async function getActivityById(activityId: number, institutionId = 1) {
   const db = await requireDb();
-  const result = await db.select().from(activities).where(eq(activities.id, activityId)).limit(1);
+  const result = await db.select().from(activities).where(and(eq(activities.id, activityId), eq(activities.institutionId, institutionId))).limit(1);
   return result[0];
 }
 
@@ -768,9 +770,9 @@ export async function listGradesForUser(user: { id: number; role: string; email?
   return query.where(and(tenantCondition, eq(grades.studentId, student.id))).orderBy(desc(grades.gradedAt));
 }
 
-export async function getGradeById(gradeId: number) {
+export async function getGradeById(gradeId: number, institutionId = 1) {
   const db = await requireDb();
-  const result = await db.select().from(grades).where(eq(grades.id, gradeId)).limit(1);
+  const result = await db.select().from(grades).where(and(eq(grades.id, gradeId), eq(grades.institutionId, institutionId))).limit(1);
   return result[0];
 }
 
@@ -899,9 +901,9 @@ export async function listLiveClassesForUser(user: { id: number; role: string; e
   return query.innerJoin(enrollments, eq(enrollments.subjectId, subjects.id)).where(and(eq(enrollments.studentId, student.id), eq(liveClasses.status, "published"), eq(liveClasses.institutionId, institutionId), eq(subjects.institutionId, institutionId), eq(enrollments.institutionId, institutionId))).orderBy(liveClasses.startsAt);
 }
 
-export async function getLiveClassById(id: number) {
+export async function getLiveClassById(id: number, institutionId = 1) {
   const db = await requireDb();
-  const result = await db.select().from(liveClasses).where(eq(liveClasses.id, id)).limit(1);
+  const result = await db.select().from(liveClasses).where(and(eq(liveClasses.id, id), eq(liveClasses.institutionId, institutionId))).limit(1);
   return result[0];
 }
 

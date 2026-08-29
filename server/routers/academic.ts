@@ -280,12 +280,12 @@ export const academicRouter = router({
     }),
     update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: studentInput })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
-      await db.updateStudent(input.id, input.data);
+      await db.updateStudent(input.id, ctx.institutionId ?? 1, input.data);
       return { success: true };
     }),
     remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
-      await db.deleteStudent(input.id);
+      await db.deleteStudent(input.id, ctx.institutionId ?? 1);
       return { success: true };
     }),
   }),
@@ -299,12 +299,12 @@ export const academicRouter = router({
     }),
     update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: subjectInput.extend({ active: z.boolean() }) })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
-      await db.updateSubject(input.id, input.data);
+      await db.updateSubject(input.id, ctx.institutionId ?? 1, input.data);
       return { success: true };
     }),
     remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
-      await db.deleteSubject(input.id);
+      await db.deleteSubject(input.id, ctx.institutionId ?? 1);
       return { success: true };
     }),
     enroll: protectedProcedure.input(z.object({ studentId: z.number().int().positive(), subjectId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
@@ -331,17 +331,17 @@ export const academicRouter = router({
       return { id: await db.createActivity({ ...input, ...attachment, createdBy: ctx.user.id, institutionId: ctx.institutionId ?? 1, dueAt: input.dueAt ? new Date(input.dueAt) : null }) };
     }),
     update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: activityInput.omit({ subjectId: true }) })).mutation(async ({ ctx, input }) => {
-      const activity = await db.getActivityById(input.id);
+      const activity = await db.getActivityById(input.id, ctx.institutionId ?? 1);
       if (!activity) throw new TRPCError({ code: "NOT_FOUND", message: "Actividad no encontrada." });
-      await assertSubjectManager(ctx.user, activity.subjectId);
+      await assertSubjectManager(ctx.user, activity.subjectId, ctx.institutionId ?? 1);
       const attachment = await uploadAttachment(ctx.user.id, input.data.attachment);
       await db.updateActivity(input.id, { ...input.data, ...attachment, dueAt: input.data.dueAt ? new Date(input.data.dueAt) : null });
       return { success: true };
     }),
     remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
-      const activity = await db.getActivityById(input.id);
+      const activity = await db.getActivityById(input.id, ctx.institutionId ?? 1);
       if (!activity) throw new TRPCError({ code: "NOT_FOUND", message: "Actividad no encontrada." });
-      await assertSubjectManager(ctx.user, activity.subjectId);
+      await assertSubjectManager(ctx.user, activity.subjectId, ctx.institutionId ?? 1);
       await db.deleteActivity(input.id);
       return { success: true };
     }),
@@ -355,7 +355,7 @@ export const academicRouter = router({
     }),
     update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: liveClassInput.omit({ subjectId: true }) })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
-      const liveClass = await db.getLiveClassById(input.id);
+      const liveClass = await db.getLiveClassById(input.id, ctx.institutionId ?? 1);
       if (!liveClass) throw new TRPCError({ code: "NOT_FOUND", message: "Clase en vivo no encontrada." });
       await db.updateLiveClass(input.id, { ...input.data, startsAt: new Date(input.data.startsAt) });
       return { success: true };
@@ -376,16 +376,16 @@ export const academicRouter = router({
       return { id: await db.createGrade({ ...input, gradedBy: ctx.user.id, institutionId: ctx.institutionId ?? 1 }) };
     }),
     update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: z.object({ period: z.string().trim().min(1).max(60), title: z.string().trim().min(2).max(220), score: z.number().int().min(0).max(1000), maxScore: z.number().int().min(1).max(1000), notes: z.string().trim().max(5000).nullable().optional() }) })).mutation(async ({ ctx, input }) => {
-      const grade = await db.getGradeById(input.id);
+      const grade = await db.getGradeById(input.id, ctx.institutionId ?? 1);
       if (!grade) throw new TRPCError({ code: "NOT_FOUND", message: "Nota no encontrada." });
-      await assertSubjectManager(ctx.user, grade.subjectId);
+      await assertSubjectManager(ctx.user, grade.subjectId, ctx.institutionId ?? 1);
       await db.updateGrade(input.id, input.data);
       return { success: true };
     }),
     remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
-      const grade = await db.getGradeById(input.id);
+      const grade = await db.getGradeById(input.id, ctx.institutionId ?? 1);
       if (!grade) throw new TRPCError({ code: "NOT_FOUND", message: "Nota no encontrada." });
-      await assertSubjectManager(ctx.user, grade.subjectId);
+      await assertSubjectManager(ctx.user, grade.subjectId, ctx.institutionId ?? 1);
       await db.deleteGrade(input.id);
       return { success: true };
     }),
