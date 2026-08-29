@@ -309,12 +309,12 @@ export const academicRouter = router({
     }),
     enroll: protectedProcedure.input(z.object({ studentId: z.number().int().positive(), subjectId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
-      await db.enrollStudent(input.studentId, input.subjectId);
+      await db.enrollStudent(input.studentId, input.subjectId, ctx.institutionId ?? 1);
       return { success: true };
     }),
     unenroll: protectedProcedure.input(z.object({ studentId: z.number().int().positive(), subjectId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
-      await db.removeEnrollment(input.studentId, input.subjectId);
+      await db.removeEnrollment(input.studentId, input.subjectId, ctx.institutionId ?? 1);
       return { success: true };
     }),
     enrollments: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
@@ -404,9 +404,9 @@ export const academicRouter = router({
       return { success: true };
     }),
     grade: protectedProcedure.input(z.object({ id: z.number().int().positive(), score: z.number().int().min(0).max(1000), feedback: z.string().trim().max(5000).nullable().optional() })).mutation(async ({ ctx, input }) => {
-      const submission = await db.getSubmissionById(input.id);
+      const submission = await db.getSubmissionById(input.id, ctx.institutionId ?? 1);
       if (!submission) throw new TRPCError({ code: "NOT_FOUND", message: "Entrega no encontrada." });
-      await assertSubjectManager(ctx.user, submission.subjectId);
+      await assertSubjectManager(ctx.user, submission.subjectId, ctx.institutionId ?? 1);
       await db.gradeSubmission(input.id, { score: input.score, feedback: input.feedback, gradedBy: ctx.user.id });
       return { success: true };
     }),

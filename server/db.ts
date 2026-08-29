@@ -401,36 +401,36 @@ export async function updateSubject(
 
 export async function deleteSubject(subjectId: number, institutionId = 1) {
   const db = await requireDb();
-  const activityRows = await db.select({ id: activities.id }).from(activities).where(eq(activities.subjectId, subjectId));
+  const activityRows = await db.select({ id: activities.id }).from(activities).where(and(eq(activities.subjectId, subjectId), eq(activities.institutionId, institutionId)));
   const activityIds = activityRows.map(row => row.id);
-  const moduleRows = await db.select({ id: courseModules.id }).from(courseModules).where(eq(courseModules.subjectId, subjectId));
+  const moduleRows = await db.select({ id: courseModules.id }).from(courseModules).where(and(eq(courseModules.subjectId, subjectId), eq(courseModules.institutionId, institutionId)));
   const moduleIds = moduleRows.map(row => row.id);
-  const lessonRows = moduleIds.length ? await db.select({ id: courseLessons.id }).from(courseLessons).where(inArray(courseLessons.moduleId, moduleIds)) : [];
+  const lessonRows = moduleIds.length ? await db.select({ id: courseLessons.id }).from(courseLessons).where(and(inArray(courseLessons.moduleId, moduleIds), eq(courseLessons.institutionId, institutionId))) : [];
   const lessonIds = lessonRows.map(row => row.id);
-  const assessmentRows = moduleIds.length ? await db.select({ id: moduleAssessments.id }).from(moduleAssessments).where(inArray(moduleAssessments.moduleId, moduleIds)) : [];
+  const assessmentRows = moduleIds.length ? await db.select({ id: moduleAssessments.id }).from(moduleAssessments).where(and(inArray(moduleAssessments.moduleId, moduleIds), eq(moduleAssessments.institutionId, institutionId))) : [];
   const assessmentIds = assessmentRows.map(row => row.id);
-  if (activityIds.length) await db.delete(submissions).where(inArray(submissions.activityId, activityIds));
-  if (assessmentIds.length) await db.delete(moduleAssessmentAttempts).where(inArray(moduleAssessmentAttempts.assessmentId, assessmentIds));
-  if (lessonIds.length) await db.delete(lessonProgress).where(inArray(lessonProgress.lessonId, lessonIds));
-  if (moduleIds.length) await db.delete(courseLessons).where(inArray(courseLessons.moduleId, moduleIds));
+  if (activityIds.length) await db.delete(submissions).where(and(inArray(submissions.activityId, activityIds), eq(submissions.institutionId, institutionId)));
+  if (assessmentIds.length) await db.delete(moduleAssessmentAttempts).where(and(inArray(moduleAssessmentAttempts.assessmentId, assessmentIds), eq(moduleAssessmentAttempts.institutionId, institutionId)));
+  if (lessonIds.length) await db.delete(lessonProgress).where(and(inArray(lessonProgress.lessonId, lessonIds), eq(lessonProgress.institutionId, institutionId)));
+  if (moduleIds.length) await db.delete(courseLessons).where(and(inArray(courseLessons.moduleId, moduleIds), eq(courseLessons.institutionId, institutionId)));
   await db.delete(activities).where(and(eq(activities.subjectId, subjectId), eq(activities.institutionId, institutionId)));
-  if (moduleIds.length) await db.delete(moduleAssessments).where(inArray(moduleAssessments.moduleId, moduleIds));
-  await db.delete(courseModules).where(eq(courseModules.subjectId, subjectId));
-  await db.delete(courseResources).where(eq(courseResources.subjectId, subjectId));
-  await db.delete(competencies).where(eq(competencies.subjectId, subjectId));
-  await db.delete(enrollments).where(eq(enrollments.subjectId, subjectId));
-  await db.delete(grades).where(eq(grades.subjectId, subjectId));
-  await db.delete(subjects).where(eq(subjects.id, subjectId));
+  if (moduleIds.length) await db.delete(moduleAssessments).where(and(inArray(moduleAssessments.moduleId, moduleIds), eq(moduleAssessments.institutionId, institutionId)));
+  await db.delete(courseModules).where(and(eq(courseModules.subjectId, subjectId), eq(courseModules.institutionId, institutionId)));
+  await db.delete(courseResources).where(and(eq(courseResources.subjectId, subjectId), eq(courseResources.institutionId, institutionId)));
+  await db.delete(competencies).where(and(eq(competencies.subjectId, subjectId), eq(competencies.institutionId, institutionId)));
+  await db.delete(enrollments).where(and(eq(enrollments.subjectId, subjectId), eq(enrollments.institutionId, institutionId)));
+  await db.delete(grades).where(and(eq(grades.subjectId, subjectId), eq(grades.institutionId, institutionId)));
+  await db.delete(subjects).where(and(eq(subjects.id, subjectId), eq(subjects.institutionId, institutionId)));
 }
 
-export async function enrollStudent(studentId: number, subjectId: number) {
+export async function enrollStudent(studentId: number, subjectId: number, institutionId = 1) {
   const db = await requireDb();
-  await db.insert(enrollments).values({ studentId, subjectId }).onDuplicateKeyUpdate({ set: { studentId } });
+  await db.insert(enrollments).values({ studentId, subjectId, institutionId }).onDuplicateKeyUpdate({ set: { studentId, institutionId } });
 }
 
-export async function removeEnrollment(studentId: number, subjectId: number) {
+export async function removeEnrollment(studentId: number, subjectId: number, institutionId = 1) {
   const db = await requireDb();
-  await db.delete(enrollments).where(and(eq(enrollments.studentId, studentId), eq(enrollments.subjectId, subjectId)));
+  await db.delete(enrollments).where(and(eq(enrollments.studentId, studentId), eq(enrollments.subjectId, subjectId), eq(enrollments.institutionId, institutionId)));
 }
 
 export async function listEnrollmentsForSubject(subjectId: number) {
@@ -841,13 +841,13 @@ export async function listSubmissionsForUser(user: { id: number; role: string; e
   return query.where(and(tenantCondition, eq(submissions.studentId, student.id))).orderBy(desc(submissions.submittedAt));
 }
 
-export async function getSubmissionById(submissionId: number) {
+export async function getSubmissionById(submissionId: number, institutionId = 1) {
   const db = await requireDb();
   const result = await db
     .select({ id: submissions.id, activityId: submissions.activityId, studentId: submissions.studentId, subjectId: activities.subjectId })
     .from(submissions)
     .innerJoin(activities, eq(activities.id, submissions.activityId))
-    .where(eq(submissions.id, submissionId))
+    .where(and(eq(submissions.id, submissionId), eq(submissions.institutionId, institutionId), eq(activities.institutionId, institutionId)))
     .limit(1);
   return result[0];
 }
