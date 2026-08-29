@@ -76,6 +76,7 @@ const studentInput = z.object({
   birthDate: z.string().date().nullable().optional(),
   phone: z.string().trim().max(32).nullable().optional(),
   guardianName: z.string().trim().max(180).nullable().optional(),
+  profilePhotoUrl: z.string().url().max(1024).nullable().optional(),
   status: z.enum(["active", "inactive"]).default("active"),
 });
 
@@ -238,6 +239,19 @@ async function uploadAttachment(userId: number, attachment?: z.infer<typeof file
 }
 
 export const academicRouter = router({
+  profile: router({
+    me: protectedProcedure.query(({ ctx }) => db.getProfileForUser(ctx.user.id, ctx.institutionId ?? 1)),
+    uploadPhoto: protectedProcedure.input(fileInput).mutation(async ({ ctx, input }) => {
+      if (!input.mimeType.startsWith("image/")) throw new TRPCError({ code: "BAD_REQUEST", message: "La foto debe ser una imagen." });
+      const uploaded = await uploadAttachment(ctx.user.id, input, "profiles");
+      return db.updateProfile(ctx.user.id, ctx.institutionId ?? 1, { profilePhotoUrl: uploaded.resourceFileUrl });
+    }),
+    update: protectedProcedure.input(z.object({ name: z.string().trim().min(2).max(180), phone: z.string().trim().max(32).nullable().optional(), bio: z.string().trim().max(2000).nullable().optional(), profilePhotoUrl: z.string().url().max(1024).nullable().optional() })).mutation(async ({ ctx, input }) => {
+      const profile = await db.updateProfile(ctx.user.id, ctx.institutionId ?? 1, input);
+      if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Perfil no disponible en la institución activa." });
+      return profile;
+    }),
+  }),
   dashboard: protectedProcedure.query(async ({ ctx }) => db.getDashboardStats({ ...ctx.user, role: roleForAccess(ctx.user.role) })),
 
   users: router({

@@ -184,6 +184,24 @@ export async function getUserByEmail(email: string) {
   return result[0];
 }
 
+export async function getProfileForUser(userId: number, institutionId = 1) {
+  const db = await requireDb();
+  const [user] = await db.select({ id: users.id, name: users.name, email: users.email, phone: users.phone, bio: users.bio, profilePhotoUrl: users.profilePhotoUrl, role: users.role })
+    .from(users).innerJoin(institutionMemberships, eq(institutionMemberships.userId, users.id))
+    .where(and(eq(users.id, userId), eq(institutionMemberships.institutionId, institutionId))).limit(1);
+  if (!user) return undefined;
+  const [student] = await db.select({ fullName: students.fullName, documentId: students.documentId, birthDate: students.birthDate, phone: students.phone, guardianName: students.guardianName, profilePhotoUrl: students.profilePhotoUrl })
+    .from(students).where(and(eq(students.userId, userId), eq(students.institutionId, institutionId))).limit(1);
+  return { ...user, student: student || null };
+}
+
+export async function updateProfile(userId: number, institutionId: number, input: { name?: string; phone?: string | null; bio?: string | null; profilePhotoUrl?: string | null }) {
+  const db = await requireDb();
+  await db.update(users).set({ name: input.name, phone: input.phone, bio: input.bio, profilePhotoUrl: input.profilePhotoUrl }).where(eq(users.id, userId));
+  await db.update(students).set({ fullName: input.name, phone: input.phone, profilePhotoUrl: input.profilePhotoUrl }).where(and(eq(students.userId, userId), eq(students.institutionId, institutionId)));
+  return getProfileForUser(userId, institutionId);
+}
+
 export async function createLocalUser(input: { name: string; email: string; passwordHash: string; role?: "admin" | "teacher" | "student"; institutionId?: number }) {
   const db = await requireDb();
   const openId = `local_${crypto.randomUUID().replace(/-/g, "")}`;
@@ -270,6 +288,7 @@ export async function listStudentsForTeacher(teacherId: number, institutionId = 
       birthDate: students.birthDate,
       phone: students.phone,
       guardianName: students.guardianName,
+      profilePhotoUrl: students.profilePhotoUrl,
       status: students.status,
       createdAt: students.createdAt,
       updatedAt: students.updatedAt,
@@ -303,6 +322,7 @@ export async function createStudent(input: {
   birthDate?: string | null;
   phone?: string | null;
   guardianName?: string | null;
+  profilePhotoUrl?: string | null;
   status?: "active" | "inactive";
   institutionId?: number;
 }) {
@@ -326,6 +346,7 @@ export async function updateStudent(
     birthDate?: string | null;
     phone?: string | null;
     guardianName?: string | null;
+    profilePhotoUrl?: string | null;
     status: "active" | "inactive";
   }
 ) {
@@ -361,12 +382,16 @@ export async function listSubjectsForUser(user: { id: number; role: string; emai
       description: subjects.description,
       period: subjects.period,
       teacherId: subjects.teacherId,
+      teacherName: users.name,
+      teacherEmail: users.email,
+      teacherPhotoUrl: users.profilePhotoUrl,
       color: subjects.color,
       active: subjects.active,
       createdAt: subjects.createdAt,
       updatedAt: subjects.updatedAt,
     })
     .from(subjects)
+    .leftJoin(users, eq(users.id, subjects.teacherId))
     .innerJoin(enrollments, eq(enrollments.subjectId, subjects.id))
     .where(and(eq(enrollments.studentId, student.id), eq(subjects.institutionId, institutionId), eq(enrollments.institutionId, institutionId)))
     .orderBy(desc(subjects.createdAt));
@@ -809,10 +834,15 @@ export async function listGradesForUser(user: { id: number; role: string; email?
     gradedBy: grades.gradedBy,
     gradedAt: grades.gradedAt,
     studentName: students.fullName,
+    studentEmail: students.email,
+    studentPhotoUrl: students.profilePhotoUrl,
     subjectName: subjects.name,
     subjectCode: subjects.code,
+    teacherName: users.name,
+    teacherEmail: users.email,
+    teacherPhotoUrl: users.profilePhotoUrl,
   };
-  const query = db.select(base).from(grades).innerJoin(students, eq(students.id, grades.studentId)).innerJoin(subjects, eq(subjects.id, grades.subjectId));
+  const query = db.select(base).from(grades).innerJoin(students, eq(students.id, grades.studentId)).innerJoin(subjects, eq(subjects.id, grades.subjectId)).leftJoin(users, eq(users.id, subjects.teacherId));
   const tenantCondition = and(eq(grades.institutionId, institutionId), eq(students.institutionId, institutionId), eq(subjects.institutionId, institutionId));
   if (user.role === "admin") return query.where(tenantCondition).orderBy(desc(grades.gradedAt));
   if (user.role === "teacher") return query.where(and(tenantCondition, eq(subjects.teacherId, user.id))).orderBy(desc(grades.gradedAt));

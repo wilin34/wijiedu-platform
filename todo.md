@@ -242,3 +242,11 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Permitir al propietario eliminar instituciones creadas, junto con sus administradores y datos asociados.
 - [x] Proteger la institución principal y evitar eliminaciones cruzadas o no autorizadas.
 - [x] Probar permisos, limpieza de datos y actualización del contexto institucional tras eliminar.
+
+## Informes y perfiles académicos
+
+- [x] Diseñar informe descargable de notas con estudiante, curso, docente, período y calificaciones.
+- [x] Añadir información y foto de perfil para estudiantes y docentes con almacenamiento seguro.
+- [x] Mostrar a cada usuario únicamente la información de perfiles permitida por su rol e institución.
+- [x] Permitir que estudiantes consulten su información y notas, y que docentes consulten la información de sus estudiantes.
+- [x] Probar privacidad, exportación, fotos y visualización responsive.

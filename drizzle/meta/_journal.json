@@ -85,6 +85,13 @@
       "when": 1788009053075,
       "tag": "0011_goofy_reavers",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1788022613357,
+      "tag": "0012_magenta_smiling_tiger",
+      "breakpoints": true
     }
   ]
 }
