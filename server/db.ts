@@ -546,9 +546,9 @@ export async function canAccessSubject(user: { id: number; role: string; email?:
   return Boolean(student && await isStudentEnrolled(student.id, subjectId));
 }
 
-export async function listCourseResources(subjectId: number) {
+export async function listCourseResources(subjectId: number, institutionId = 1) {
   const db = await requireDb();
-  return db.select().from(courseResources).where(eq(courseResources.subjectId, subjectId)).orderBy(desc(courseResources.createdAt));
+  return db.select().from(courseResources).where(and(eq(courseResources.subjectId, subjectId), eq(courseResources.institutionId, institutionId))).orderBy(desc(courseResources.createdAt));
 }
 
 export async function createCourseResource(input: {
@@ -565,9 +565,9 @@ export async function createCourseResource(input: {
   return Number(result[0].insertId);
 }
 
-export async function listCompetencies(subjectId: number) {
+export async function listCompetencies(subjectId: number, institutionId = 1) {
   const db = await requireDb();
-  return db.select().from(competencies).where(eq(competencies.subjectId, subjectId)).orderBy(competencies.createdAt);
+  return db.select().from(competencies).where(and(eq(competencies.subjectId, subjectId), eq(competencies.institutionId, institutionId))).orderBy(competencies.createdAt);
 }
 
 export async function createCompetency(input: {
@@ -613,11 +613,11 @@ export async function createCourseLesson(input: {
   return Number(result[0].insertId);
 }
 
-export async function listCourseModulesForSubject(subjectId: number) {
+export async function listCourseModulesForSubject(subjectId: number, institutionId = 1) {
   const db = await requireDb();
-  const modules = await db.select().from(courseModules).where(eq(courseModules.subjectId, subjectId)).orderBy(courseModules.sortOrder);
+  const modules = await db.select().from(courseModules).where(and(eq(courseModules.subjectId, subjectId), eq(courseModules.institutionId, institutionId))).orderBy(courseModules.sortOrder);
   if (!modules.length) return [];
-  const lessons = await db.select().from(courseLessons).where(inArray(courseLessons.moduleId, modules.map(item => item.id))).orderBy(courseLessons.sortOrder);
+  const lessons = await db.select().from(courseLessons).where(and(inArray(courseLessons.moduleId, modules.map(item => item.id)), eq(courseLessons.institutionId, institutionId))).orderBy(courseLessons.sortOrder);
   return modules.map(courseModule => ({
     ...courseModule,
     learningObjectives: readStringArray(courseModule.learningObjectives),
@@ -690,40 +690,42 @@ export async function listAssessmentAttemptsForStudent(studentId: number, assess
   return db.select().from(moduleAssessmentAttempts).where(and(eq(moduleAssessmentAttempts.studentId, studentId), inArray(moduleAssessmentAttempts.assessmentId, assessmentIds))).orderBy(desc(moduleAssessmentAttempts.completedAt));
 }
 
-export async function setLessonCompletion(input: { lessonId: number; studentId: number; completed: boolean }) {
+export async function setLessonCompletion(input: { lessonId: number; studentId: number; completed: boolean; institutionId?: number }) {
   const db = await requireDb();
+  const lesson = await getCourseLessonById(input.lessonId, input.institutionId ?? 1);
+  if (!lesson) return;
   if (!input.completed) {
     await db.delete(lessonProgress).where(and(eq(lessonProgress.lessonId, input.lessonId), eq(lessonProgress.studentId, input.studentId)));
     return;
   }
-  await db.insert(lessonProgress).values({ lessonId: input.lessonId, studentId: input.studentId }).onDuplicateKeyUpdate({ set: { completedAt: new Date() } });
+  await db.insert(lessonProgress).values({ lessonId: input.lessonId, studentId: input.studentId, institutionId: input.institutionId ?? 1 }).onDuplicateKeyUpdate({ set: { completedAt: new Date() } });
 }
 
-export async function listCompletedLessonsForStudent(studentId: number, subjectId: number) {
+export async function listCompletedLessonsForStudent(studentId: number, subjectId: number, institutionId = 1) {
   const db = await requireDb();
   return db.select({ lessonId: lessonProgress.lessonId, completedAt: lessonProgress.completedAt })
     .from(lessonProgress)
     .innerJoin(courseLessons, eq(courseLessons.id, lessonProgress.lessonId))
     .innerJoin(courseModules, eq(courseModules.id, courseLessons.moduleId))
-    .where(and(eq(lessonProgress.studentId, studentId), eq(courseModules.subjectId, subjectId)));
+    .where(and(eq(lessonProgress.studentId, studentId), eq(courseModules.subjectId, subjectId), eq(lessonProgress.institutionId, institutionId), eq(courseLessons.institutionId, institutionId), eq(courseModules.institutionId, institutionId)));
 }
 
-export async function listMessageRecipients(subjectId: number) {
+export async function listMessageRecipients(subjectId: number, institutionId = 1) {
   const db = await requireDb();
   return db
     .selectDistinct({ id: users.id, name: users.name, email: users.email, role: users.role })
     .from(users)
     .innerJoin(students, eq(students.userId, users.id))
     .innerJoin(enrollments, eq(enrollments.studentId, students.id))
-    .where(eq(enrollments.subjectId, subjectId));
+    .where(and(eq(enrollments.subjectId, subjectId), eq(enrollments.institutionId, institutionId), eq(students.institutionId, institutionId)));
 }
 
-export async function listMessagesForUser(subjectId: number, userId: number) {
+export async function listMessagesForUser(subjectId: number, userId: number, institutionId = 1) {
   const db = await requireDb();
   return db
     .select()
     .from(messages)
-    .where(and(eq(messages.subjectId, subjectId), or(eq(messages.senderId, userId), eq(messages.recipientId, userId))))
+    .where(and(eq(messages.subjectId, subjectId), eq(messages.institutionId, institutionId), or(eq(messages.senderId, userId), eq(messages.recipientId, userId))))
     .orderBy(messages.createdAt);
 }
 
@@ -808,9 +810,9 @@ export async function updateActivity(
   }
 ) {
   const db = await requireDb();
-  const [existing] = await db.select({ subjectId: activities.subjectId, title: activities.title, status: activities.status }).from(activities).where(eq(activities.id, activityId)).limit(1);
+  const [existing] = await db.select({ subjectId: activities.subjectId, title: activities.title, status: activities.status, institutionId: activities.institutionId }).from(activities).where(eq(activities.id, activityId)).limit(1);
   await db.update(activities).set(input).where(eq(activities.id, activityId));
-  if (existing && input.status === "published" && existing.status !== "published") await notifySubjectStudents(existing.subjectId, "academic", "Nueva actividad publicada", input.title, `/materias/${existing.subjectId}`);
+  if (existing && input.status === "published" && existing.status !== "published") await notifySubjectStudents(existing.subjectId, "academic", "Nueva actividad publicada", input.title, `/materias/${existing.subjectId}`, existing.institutionId);
 }
 
 export async function deleteActivity(activityId: number) {
@@ -1015,9 +1017,9 @@ export async function updateLiveClass(id: number, input: {
   status: "draft" | "published" | "completed" | "cancelled";
 }) {
   const db = await requireDb();
-  const [existing] = await db.select({ subjectId: liveClasses.subjectId, title: liveClasses.title, status: liveClasses.status }).from(liveClasses).where(eq(liveClasses.id, id)).limit(1);
+  const [existing] = await db.select({ subjectId: liveClasses.subjectId, title: liveClasses.title, status: liveClasses.status, institutionId: liveClasses.institutionId }).from(liveClasses).where(eq(liveClasses.id, id)).limit(1);
   await db.update(liveClasses).set(input).where(eq(liveClasses.id, id));
-  if (existing && input.status === "published" && existing.status !== "published") await notifySubjectStudents(existing.subjectId, "live_class", "Nueva clase en vivo", input.title, `/clases-en-vivo`);
+  if (existing && input.status === "published" && existing.status !== "published") await notifySubjectStudents(existing.subjectId, "live_class", "Nueva clase en vivo", input.title, `/clases-en-vivo`, existing.institutionId);
 }
 
 export async function deleteLiveClass(id: number, institutionId = 1) {
@@ -1059,7 +1061,7 @@ async function notifyUserIfEnabled(userId: number, type: "academic" | "assessmen
 }
 
 async function notifySubjectStudents(subjectId: number, type: "academic" | "assessment" | "live_class", title: string, message: string, href: string, institutionId = 1) {
-  const recipients = await listMessageRecipients(subjectId);
+  const recipients = await listMessageRecipients(subjectId, institutionId);
   await Promise.all(recipients.filter(recipient => recipient.role === "student").map(recipient => notifyUserIfEnabled(recipient.id, type, title, message, href, institutionId)));
 }
 
@@ -1077,27 +1079,28 @@ export async function updateNotificationPreferences(userId: number, input: { aca
   await db.insert(notificationPreferences).values({ userId, institutionId: input.institutionId ?? 1, ...input }).onDuplicateKeyUpdate({ set: input });
 }
 
-export async function getDashboardStats(user: { id: number; role: string; email?: string | null }) {
+export async function getDashboardStats(user: { id: number; role: string; email?: string | null; institutionId?: number }) {
   const db = await requireDb();
+  const institutionId = user.institutionId ?? 1;
   if (user.role === "admin") {
-    const [studentTotal] = await db.select({ value: count() }).from(students).where(eq(students.status, "active"));
-    const [subjectTotal] = await db.select({ value: count() }).from(subjects).where(eq(subjects.active, 1));
-    const [activityTotal] = await db.select({ value: count() }).from(activities);
-    const [average] = await db.select({ value: avg(grades.score) }).from(grades);
+    const [studentTotal] = await db.select({ value: count() }).from(students).where(and(eq(students.status, "active"), eq(students.institutionId, institutionId)));
+    const [subjectTotal] = await db.select({ value: count() }).from(subjects).where(and(eq(subjects.active, 1), eq(subjects.institutionId, institutionId)));
+    const [activityTotal] = await db.select({ value: count() }).from(activities).where(eq(activities.institutionId, institutionId));
+    const [average] = await db.select({ value: avg(grades.score) }).from(grades).where(eq(grades.institutionId, institutionId));
     return { students: Number(studentTotal?.value ?? 0), subjects: Number(subjectTotal?.value ?? 0), activities: Number(activityTotal?.value ?? 0), average: Number(average?.value ?? 0) };
   }
   if (user.role === "teacher") {
-    const [subjectTotal] = await db.select({ value: count() }).from(subjects).where(eq(subjects.teacherId, user.id));
-    const [activityTotal] = await db.select({ value: count() }).from(activities).innerJoin(subjects, eq(subjects.id, activities.subjectId)).where(eq(subjects.teacherId, user.id));
-    const [studentTotal] = await db.select({ value: count(sql`distinct ${enrollments.studentId}`) }).from(enrollments).innerJoin(subjects, eq(subjects.id, enrollments.subjectId)).where(eq(subjects.teacherId, user.id));
-    const [average] = await db.select({ value: avg(grades.score) }).from(grades).innerJoin(subjects, eq(subjects.id, grades.subjectId)).where(eq(subjects.teacherId, user.id));
+    const [subjectTotal] = await db.select({ value: count() }).from(subjects).where(and(eq(subjects.teacherId, user.id), eq(subjects.institutionId, institutionId)));
+    const [activityTotal] = await db.select({ value: count() }).from(activities).innerJoin(subjects, eq(subjects.id, activities.subjectId)).where(and(eq(subjects.teacherId, user.id), eq(subjects.institutionId, institutionId), eq(activities.institutionId, institutionId)));
+    const [studentTotal] = await db.select({ value: count(sql`distinct ${enrollments.studentId}`) }).from(enrollments).innerJoin(subjects, eq(subjects.id, enrollments.subjectId)).where(and(eq(subjects.teacherId, user.id), eq(subjects.institutionId, institutionId), eq(enrollments.institutionId, institutionId)));
+    const [average] = await db.select({ value: avg(grades.score) }).from(grades).innerJoin(subjects, eq(subjects.id, grades.subjectId)).where(and(eq(subjects.teacherId, user.id), eq(subjects.institutionId, institutionId), eq(grades.institutionId, institutionId)));
     return { students: Number(studentTotal?.value ?? 0), subjects: Number(subjectTotal?.value ?? 0), activities: Number(activityTotal?.value ?? 0), average: Number(average?.value ?? 0) };
   }
-  const student = await getStudentForUser(user.id, user.email);
+  const student = await getStudentForUser(user.id, user.email, institutionId);
   if (!student) return { students: 0, subjects: 0, activities: 0, average: 0 };
-  const [subjectTotal] = await db.select({ value: count() }).from(enrollments).where(eq(enrollments.studentId, student.id));
-  const [activityTotal] = await db.select({ value: count() }).from(activities).innerJoin(enrollments, eq(enrollments.subjectId, activities.subjectId)).where(and(eq(enrollments.studentId, student.id), eq(activities.status, "published")));
-  const [average] = await db.select({ value: avg(grades.score) }).from(grades).where(eq(grades.studentId, student.id));
+  const [subjectTotal] = await db.select({ value: count() }).from(enrollments).where(and(eq(enrollments.studentId, student.id), eq(enrollments.institutionId, institutionId)));
+  const [activityTotal] = await db.select({ value: count() }).from(activities).innerJoin(enrollments, eq(enrollments.subjectId, activities.subjectId)).where(and(eq(enrollments.studentId, student.id), eq(enrollments.institutionId, institutionId), eq(activities.institutionId, institutionId), eq(activities.status, "published")));
+  const [average] = await db.select({ value: avg(grades.score) }).from(grades).where(and(eq(grades.studentId, student.id), eq(grades.institutionId, institutionId)));
   return { students: 1, subjects: Number(subjectTotal?.value ?? 0), activities: Number(activityTotal?.value ?? 0), average: Number(average?.value ?? 0) };
 }
 

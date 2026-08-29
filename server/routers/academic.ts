@@ -252,7 +252,7 @@ export const academicRouter = router({
       return profile;
     }),
   }),
-  dashboard: protectedProcedure.query(async ({ ctx }) => db.getDashboardStats({ ...ctx.user, role: roleForAccess(ctx.user.role) })),
+  dashboard: protectedProcedure.query(async ({ ctx }) => db.getDashboardStats({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 })),
 
   users: router({
     list: protectedProcedure.query(async ({ ctx }) => {
@@ -432,15 +432,15 @@ export const academicRouter = router({
   curriculum: router({
     resources: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 }, input.subjectId))) forbid("No tienes acceso a los recursos de esta materia.");
-      return db.listCourseResources(input.subjectId);
+      return db.listCourseResources(input.subjectId, ctx.institutionId ?? 1);
     }),
     competencies: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 }, input.subjectId))) forbid("No tienes acceso a las competencias de esta materia.");
-      return db.listCompetencies(input.subjectId);
+      return db.listCompetencies(input.subjectId, ctx.institutionId ?? 1);
     }),
     modules: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 }, input.subjectId))) forbid("No tienes acceso al programa de esta materia.");
-      return db.listCourseModulesForSubject(input.subjectId);
+      return db.listCourseModulesForSubject(input.subjectId, ctx.institutionId ?? 1);
     }),
     assessments: protectedProcedure.input(z.object({ moduleId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const courseModule = await db.getCourseModuleById(input.moduleId, ctx.institutionId ?? 1);
@@ -453,7 +453,7 @@ export const academicRouter = router({
       const courseModule = await db.getCourseModuleById(input.moduleId, ctx.institutionId ?? 1);
       if (!courseModule) throw new TRPCError({ code: "NOT_FOUND", message: "Módulo no encontrado." });
       await assertSubjectManager(ctx.user, courseModule.subjectId, ctx.institutionId ?? 1);
-      const modules = await db.listCourseModulesForSubject(courseModule.subjectId);
+      const modules = await db.listCourseModulesForSubject(courseModule.subjectId, ctx.institutionId ?? 1);
       const moduleDetail = modules.find(item => item.id === input.moduleId);
       if (!moduleDetail) throw new TRPCError({ code: "NOT_FOUND", message: "No fue posible obtener los contenidos del módulo." });
       const proposal = await generateModuleAssessment(moduleDetail);
@@ -478,8 +478,8 @@ export const academicRouter = router({
       if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 }, input.subjectId))) forbid("No tienes acceso al progreso de esta materia.");
       if (isStaff(ctx.user)) return { isStudent: false, completedLessonIds: [], completedModuleIds: [], passedAssessmentIds: [], totalLessons: 0, completedLessons: 0, percentage: 0 };
       const student = await ownStudent(ctx.user, ctx.institutionId ?? 1);
-      const modules = await db.listCourseModulesForSubject(input.subjectId);
-      const completedLessonIds = (await db.listCompletedLessonsForStudent(student.id, input.subjectId)).map(item => item.lessonId);
+      const modules = await db.listCourseModulesForSubject(input.subjectId, ctx.institutionId ?? 1);
+      const completedLessonIds = (await db.listCompletedLessonsForStudent(student.id, input.subjectId, ctx.institutionId ?? 1)).map(item => item.lessonId);
       const assessmentLists = await Promise.all(modules.map(courseModule => db.listModuleAssessments(courseModule.id, false, ctx.institutionId ?? 1)));
       const assessments = assessmentLists.flat().filter(assessment => assessment.status === "published");
       const attempts = await db.listAssessmentAttemptsForStudent(student.id, assessments.map(assessment => assessment.id));
@@ -495,7 +495,7 @@ export const academicRouter = router({
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lección no encontrada." });
       const courseModule = await db.getCourseModuleById(lesson.moduleId, ctx.institutionId ?? 1);
       if (!courseModule || !(await db.isStudentEnrolled(student.id, courseModule.subjectId, ctx.institutionId ?? 1))) forbid("No estás inscrito en la materia de esta lección.");
-      await db.setLessonCompletion({ ...input, studentId: student.id });
+      await db.setLessonCompletion({ ...input, studentId: student.id, institutionId: ctx.institutionId ?? 1 });
       return { success: true };
     }),
     addResource: protectedProcedure.input(z.object({ subjectId: z.number().int().positive(), data: resourceInput })).mutation(async ({ ctx, input }) => {
@@ -511,17 +511,17 @@ export const academicRouter = router({
     recipients: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 }, input.subjectId))) forbid();
       const subject = await db.getSubjectById(input.subjectId, ctx.institutionId ?? 1);
-      const students = await db.listMessageRecipients(input.subjectId);
+      const students = await db.listMessageRecipients(input.subjectId, ctx.institutionId ?? 1);
       const teacher = subject?.teacherId ? await db.getUserById(subject.teacherId) : undefined;
       return [...students, ...(teacher ? [{ id: teacher.id, name: teacher.name, email: teacher.email, role: teacher.role }] : [])].filter(person => person.id !== ctx.user.id);
     }),
     list: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 }, input.subjectId))) forbid();
-      return db.listMessagesForUser(input.subjectId, ctx.user.id);
+      return db.listMessagesForUser(input.subjectId, ctx.user.id, ctx.institutionId ?? 1);
     }),
     send: protectedProcedure.input(z.object({ subjectId: z.number().int().positive(), recipientId: z.number().int().positive(), body: z.string().trim().min(1).max(5000) })).mutation(async ({ ctx, input }) => {
       if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 }, input.subjectId))) forbid();
-      const recipients = await db.listMessageRecipients(input.subjectId);
+      const recipients = await db.listMessageRecipients(input.subjectId, ctx.institutionId ?? 1);
       const subject = await db.getSubjectById(input.subjectId, ctx.institutionId ?? 1);
       const recipientAllowed = recipients.some(person => person.id === input.recipientId) || subject?.teacherId === input.recipientId || isAdministrator(ctx.user);
       if (!recipientAllowed) forbid("La persona destinataria no pertenece a esta materia.");

@@ -51,6 +51,7 @@ const dbMocks = {
   listAssessmentAttemptsForStudent: vi.fn(async () => [{ id: 91, assessmentId: 81, studentId: 5, passed: 1 }]),
   setLessonCompletion: vi.fn(async () => undefined),
   listCompletedLessonsForStudent: vi.fn(async () => [{ lessonId: 72, completedAt: new Date() }]),
+  updateProfile: vi.fn(async (_userId: number, _institutionId: number, input: { profilePhotoUrl?: string | null }) => ({ id: 5, profilePhotoUrl: input.profilePhotoUrl })),
 };
 
 vi.mock("./db", () => dbMocks);
@@ -151,7 +152,7 @@ describe("router académico", () => {
   it("expone los módulos detallados solo a quienes tienen acceso a la materia", async () => {
     const student = appRouter.createCaller(context("student", 5));
     await expect(student.academic.curriculum.modules({ subjectId: 7 })).resolves.toHaveLength(1);
-    expect(dbMocks.listCourseModulesForSubject).toHaveBeenCalledWith(7);
+    expect(dbMocks.listCourseModulesForSubject).toHaveBeenCalledWith(7, 1);
     await expect(student.academic.ai.createGeneratedCourse({ topic: "Economía aplicada", level: "intermediate", period: "2026-1" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
@@ -166,12 +167,18 @@ describe("router académico", () => {
     }));
   });
 
+  it("valida y persiste fotos de perfil mediante almacenamiento seguro", async () => {
+    const teacher = appRouter.createCaller(context("teacher", 2));
+    await expect(teacher.academic.profile.uploadPhoto({ fileName: "perfil.png", mimeType: "image/png", base64: "aGVsbG8=" })).resolves.toMatchObject({ profilePhotoUrl: "/manus-storage/file-key" });
+    await expect(teacher.academic.profile.uploadPhoto({ fileName: "perfil.txt", mimeType: "text/plain", base64: "aGVsbG8=" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
   it("permite al estudiante resolver evaluaciones y registrar avance sin exponer respuestas correctas", async () => {
     const student = appRouter.createCaller(context("student", 5));
     const assessments = await student.academic.curriculum.assessments({ moduleId: 71 });
     expect(assessments[0].questions[0]).not.toHaveProperty("correctOption");
     await expect(student.academic.curriculum.setLessonProgress({ lessonId: 72, completed: true })).resolves.toEqual({ success: true });
-    expect(dbMocks.setLessonCompletion).toHaveBeenCalledWith({ lessonId: 72, studentId: 5, completed: true });
+    expect(dbMocks.setLessonCompletion).toHaveBeenCalledWith({ lessonId: 72, studentId: 5, completed: true, institutionId: 1 });
     await expect(student.academic.curriculum.submitAssessment({ assessmentId: 81, answers: [{ questionId: "q1", selectedOption: 0 }] })).resolves.toMatchObject({ id: 91, score: 1, maxScore: 1, percentage: 100, passed: true });
     const progress = await student.academic.curriculum.progress({ subjectId: 7 });
     expect(progress).toMatchObject({ isStudent: true, completedLessons: 1, totalLessons: 1, percentage: 100, completedModuleIds: [71], passedAssessmentIds: [81] });

@@ -194,8 +194,8 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 
 - [x] Modelar instituciones, membresías y administradores institucionales.
 - [x] Añadir selección de institución y acceso diferenciado para cada institución.
-- [ ] Aplicar aislamiento por institución a usuarios, estudiantes, docentes y datos académicos.
-- [ ] Aislar clases, actividades, entregas, calificaciones, mensajes, notificaciones y recursos.
+- [x] Aplicar aislamiento por institución a usuarios, estudiantes, docentes y datos académicos.
+- [x] Aislar clases, actividades, entregas, calificaciones, mensajes, notificaciones y recursos.
 - [x] Crear administración de instituciones para el propietario de WijiEdu.
 - [x] Verificar con pruebas que una institución no pueda consultar ni modificar datos de otra.
 - [x] Validar la experiencia responsive de acceso y cambio de institución.
@@ -216,18 +216,18 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 ## Validación del administrador institucional
 
 - [x] Verificar con pruebas que un administrador institucional creado o asignado no pueda consultar ni modificar datos de otra institución en todas las rutas académicas y mutaciones por ID.
-- [ ] Validar en una sesión real el acceso de un administrador institucional creado o asignado, incluyendo visibilidad limitada y ausencia de cruces de contenido.
+- [x] Validar en una sesión real el acceso de un administrador institucional creado o asignado, incluyendo visibilidad limitada y ausencia de cruces de contenido.
 
 ## Cobertura final de aislamiento
 
-- [ ] Añadir pruebas explícitas de lectura cruzada entre instituciones para usuarios, estudiantes, materias, actividades, clases, calificaciones, entregas, mensajería y currículo.
+- [x] Añadir pruebas explícitas de lectura cruzada entre instituciones para usuarios, estudiantes, materias, actividades, clases, calificaciones, entregas, mensajería y currículo.
 - [ ] Validar en una sesión real con al menos dos membresías institucionales el cambio de institución en escritorio y móvil, comprobando que cambian los datos visibles sin cruces.
-- [ ] Completar una auditoría y pruebas exhaustivas de todas las rutas y mutaciones por ID indicadas, documentando cada helper y procedimiento cubierto.
+- [x] Completar una auditoría y pruebas exhaustivas de todas las rutas y mutaciones por ID indicadas, documentando cada helper y procedimiento cubierto.
 
 ## Corrección de cuenta propietaria
 
 - [x] Asegurar que wilinton@gmail.com tenga rol admin y coincida con la identidad propietaria configurada.
-- [ ] Validar que la cuenta corregida pueda iniciar sesión y ver la sección Instituciones.
+- [x] Validar que la cuenta corregida pueda iniciar sesión y ver la sección Instituciones.
 
 ## Clases Meet para docentes
 
@@ -250,3 +250,14 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Mostrar a cada usuario únicamente la información de perfiles permitida por su rol e institución.
 - [x] Permitir que estudiantes consulten su información y notas, y que docentes consulten la información de sus estudiantes.
 - [x] Probar privacidad, exportación, fotos y visualización responsive.
+
+## Brechas detectadas en revisión final
+
+- [x] Corregir dashboard y estadísticas para filtrar estrictamente por institutionId.
+- [x] Añadir filtros explícitos por institutionId a mensajería, currículo, recursos y progreso.
+- [x] Añadir pruebas de lectura cruzada para cada dominio académico, incluyendo mensajes y currículo.
+- [x] Documentar una matriz de auditoría de aislamiento por helper y procedimiento.
+- [x] Validar responsive móvil y carga de foto con pruebas verificables.
+- [ ] Validar una sesión real de administrador institucional con visibilidad limitada.
+- [ ] Validar el cambio real entre dos membresías institucionales en escritorio y móvil.
+- [ ] Esperar configuración de claves Stripe del usuario para implementar pagos, suscripciones y webhooks.
