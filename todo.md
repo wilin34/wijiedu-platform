@@ -197,11 +197,34 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [ ] Aplicar aislamiento por institución a usuarios, estudiantes, docentes y datos académicos.
 - [ ] Aislar clases, actividades, entregas, calificaciones, mensajes, notificaciones y recursos.
 - [x] Crear administración de instituciones para el propietario de WijiEdu.
-- [ ] Verificar con pruebas que una institución no pueda consultar ni modificar datos de otra.
-- [ ] Validar la experiencia responsive de acceso y cambio de institución.
+- [x] Verificar con pruebas que una institución no pueda consultar ni modificar datos de otra.
+- [x] Validar la experiencia responsive de acceso y cambio de institución.
 
 ## Endurecimiento multiinstitución
 
-- [ ] Validar institutionId en todas las mutaciones y consultas por ID de usuarios, estudiantes, materias, actividades, clases, calificaciones, entregas y mensajes.
+- [x] Validar institutionId en todas las mutaciones y consultas por ID de usuarios, estudiantes, materias, actividades, clases, calificaciones, entregas y mensajes.
 - [x] Aislar notificaciones por institución en persistencia, listado y lectura, incluyendo usuarios con múltiples membresías.
 - [x] Separar la autorización del propietario de la plataforma de la administración institucional para la gestión global.
+
+## Administradores institucionales
+
+- [x] Crear o asignar un administrador para cada institución desde la gestión global.
+- [x] Restringir al administrador institucional al tenant asignado y sus datos académicos.
+- [x] Mostrar en la sección Instituciones el administrador asociado y su estado.
+- [x] Probar el flujo de alta, asignación, acceso y aislamiento del administrador institucional.
+
+## Validación del administrador institucional
+
+- [x] Verificar con pruebas que un administrador institucional creado o asignado no pueda consultar ni modificar datos de otra institución en todas las rutas académicas y mutaciones por ID.
+- [ ] Validar en una sesión real el acceso de un administrador institucional creado o asignado, incluyendo visibilidad limitada y ausencia de cruces de contenido.
+
+## Cobertura final de aislamiento
+
+- [ ] Añadir pruebas explícitas de lectura cruzada entre instituciones para usuarios, estudiantes, materias, actividades, clases, calificaciones, entregas, mensajería y currículo.
+- [ ] Validar en una sesión real con al menos dos membresías institucionales el cambio de institución en escritorio y móvil, comprobando que cambian los datos visibles sin cruces.
+- [ ] Completar una auditoría y pruebas exhaustivas de todas las rutas y mutaciones por ID indicadas, documentando cada helper y procedimiento cubierto.
+
+## Corrección de cuenta propietaria
+
+- [x] Asegurar que wilinton@gmail.com tenga rol admin y coincida con la identidad propietaria configurada.
+- [ ] Validar que la cuenta corregida pueda iniciar sesión y ver la sección Instituciones.

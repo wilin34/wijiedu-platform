@@ -18,19 +18,19 @@ const dbMocks = {
   enrollStudent: vi.fn(async () => undefined),
   removeEnrollment: vi.fn(async () => undefined),
   listEnrollmentsForSubject: vi.fn(async () => []),
-  getSubjectById: vi.fn(async () => ({ id: 7, teacherId: 2 })),
-  getActivityById: vi.fn(async () => ({ id: 11, subjectId: 7, status: "published" })),
+  getSubjectById: vi.fn(async (_id: number, institutionId = 1) => institutionId === 2 ? undefined : ({ id: 7, teacherId: 2 })),
+  getActivityById: vi.fn(async (_id: number, institutionId = 1) => institutionId === 2 ? undefined : ({ id: 11, subjectId: 7, status: "published" })),
   createActivity: vi.fn(async () => 27),
   updateActivity: vi.fn(async () => undefined),
   deleteActivity: vi.fn(async () => undefined),
   isStudentEnrolled: vi.fn(async () => true),
-  getGradeById: vi.fn(async () => ({ id: 31, subjectId: 7 })),
+  getGradeById: vi.fn(async (_id: number, institutionId = 1) => institutionId === 2 ? undefined : ({ id: 31, subjectId: 7 })),
   createGrade: vi.fn(async () => 31),
   updateGrade: vi.fn(async () => undefined),
   deleteGrade: vi.fn(async () => undefined),
   getStudentForUser: vi.fn(async () => ({ id: 5, email: "student@wijiedu.test" })),
   createSubmission: vi.fn(async () => undefined),
-  getSubmissionById: vi.fn(async () => ({ id: 33, activityId: 11, studentId: 5, subjectId: 7 })),
+  getSubmissionById: vi.fn(async (_id: number, institutionId = 1) => institutionId === 2 ? undefined : ({ id: 33, activityId: 11, studentId: 5, subjectId: 7 })),
   gradeSubmission: vi.fn(async () => undefined),
   canAccessSubject: vi.fn(async () => true),
   listMessageRecipients: vi.fn(async () => [{ id: 2, name: "Docente", email: "teacher@wijiedu.test", role: "teacher" }]),
@@ -38,7 +38,7 @@ const dbMocks = {
   createMessage: vi.fn(async () => 44),
   listLiveClassesForUser: vi.fn(async () => [{ id: 61, subjectId: 7, title: "Tutoría", meetUrl: "https://meet.google.com/abc-defg-hij", startsAt: new Date(), durationMinutes: 60, status: "published" }]),
   createLiveClass: vi.fn(async () => 61),
-  getLiveClassById: vi.fn(async () => ({ id: 61, subjectId: 7, createdBy: 1 })),
+  getLiveClassById: vi.fn(async (_id: number, institutionId = 1) => institutionId === 2 ? undefined : ({ id: 61, subjectId: 7, createdBy: 1 })),
   updateLiveClass: vi.fn(async () => undefined),
   deleteLiveClass: vi.fn(async () => undefined),
   listCourseModulesForSubject: vi.fn(async () => [{ id: 71, subjectId: 7, title: "Módulo de prueba", learningObjectives: ["Aplicar conceptos"], lessons: [{ id: 72, title: "Clase de prueba", keyTopics: ["Tema"] }] }]),
@@ -77,6 +77,15 @@ describe("router académico", () => {
     const admin = appRouter.createCaller({ ...context("admin"), institutionId: 2 });
     await expect(admin.academic.users.setRole({ userId: 4, role: "teacher" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(admin.academic.users.remove({ userId: 4 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rechaza operaciones académicas por ID fuera del tenant activo", async () => {
+    const otherAdmin = appRouter.createCaller({ ...context("admin"), institutionId: 2 });
+    await expect(otherAdmin.academic.subjects.update({ id: 7, data: { ...subjectData, color: "#4F8EF7", active: true } })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(otherAdmin.academic.activities.update({ id: 11, data: { title: "Fuera", maxScore: 100, status: "published" } })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(otherAdmin.academic.grades.update({ id: 31, data: { period: "2026-1", title: "Fuera", score: 90, maxScore: 100 } })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(otherAdmin.academic.liveClasses.update({ id: 61, data: { subjectId: 7, title: "Fuera", meetUrl: "https://meet.google.com/abc-defg-hij", startsAt: new Date().toISOString(), durationMinutes: 60, status: "published" } })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(otherAdmin.academic.submissions.grade({ id: 33, score: 80 })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("solo permite al administrador consultar cuentas y gestionar estudiantes", async () => {

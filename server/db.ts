@@ -88,6 +88,15 @@ export async function addInstitutionMembership(input: { institutionId: number; u
   await db.insert(institutionMemberships).values(input).onDuplicateKeyUpdate({ set: { role: input.role } });
 }
 
+export async function listInstitutionAdmins(institutionId: number) {
+  const db = await requireDb();
+  return db.select({ id: users.id, name: users.name, email: users.email, role: institutionMemberships.role })
+    .from(institutionMemberships)
+    .innerJoin(users, eq(users.id, institutionMemberships.userId))
+    .where(and(eq(institutionMemberships.institutionId, institutionId), eq(institutionMemberships.role, "admin")))
+    .orderBy(asc(users.name));
+}
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await requireDb();
@@ -367,7 +376,7 @@ export async function createSubjectWithCurriculum(input: {
 }) {
   const institutionId = input.institutionId ?? 1;
   const subjectId = await createSubject({ ...input, institutionId });
-  for (const studentId of input.studentIds ?? []) await enrollStudent(studentId, subjectId);
+  for (const studentId of input.studentIds ?? []) await enrollStudent(studentId, subjectId, institutionId);
   for (const resource of input.resources ?? []) await createCourseResource({ ...resource, subjectId, createdBy: input.createdBy, institutionId });
   for (const competency of input.competencies ?? []) await createCompetency({ ...competency, subjectId, institutionId });
   for (let moduleIndex = 0; moduleIndex < (input.modules ?? []).length; moduleIndex += 1) {

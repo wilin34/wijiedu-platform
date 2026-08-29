@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   listInstitutions: vi.fn(async () => [{ id: 1, name: "Institución A", slug: "institucion-a", status: "active" }]),
   createInstitution: vi.fn(async () => 2),
   addInstitutionMembership: vi.fn(),
+  getUserByEmail: vi.fn(async () => undefined),
+  createLocalUser: vi.fn(async () => ({ id: 12, name: "Admin Institucional", email: "admin@institucion.test", role: "admin" })),
 }));
 
 vi.mock("./db", () => mocks);
@@ -28,6 +30,11 @@ describe("institutions", () => {
     expect(mocks.listInstitutionsForUser).toHaveBeenCalledWith(7);
   });
 
+  it("reconoce a wilinton@gmail.com como propietario local de la plataforma", async () => {
+    const localOwner = appRouter.createCaller({ ...context("admin"), user: { ...context("admin").user, email: "wilinton@gmail.com", role: "admin" } });
+    await expect(localOwner.institutions.list()).resolves.toHaveLength(1);
+  });
+
   it("reserva la gestión global a administración", async () => {
     const student = appRouter.createCaller(context("student"));
     await expect(student.institutions.list()).rejects.toMatchObject({ code: "FORBIDDEN" });
@@ -37,5 +44,18 @@ describe("institutions", () => {
     await expect(admin.institutions.create({ name: "Institución B", slug: "institucion-b" })).resolves.toEqual({ id: 2 });
     await expect(admin.institutions.addMember({ institutionId: 2, userId: 9, role: "teacher" })).resolves.toEqual({ success: true });
     expect(mocks.addInstitutionMembership).toHaveBeenCalledWith({ institutionId: 2, userId: 9, role: "teacher" });
+  });
+
+  it("permite al propietario crear un administrador institucional con credenciales locales", async () => {
+    const owner = appRouter.createCaller(context("admin", true));
+    await expect(owner.institutions.createAdmin({ institutionId: 2, name: "Admin Colegio", email: "admin@colegio.test", password: "Segura123" })).resolves.toEqual({ id: 12, created: true });
+    expect(mocks.createLocalUser).toHaveBeenCalledWith(expect.objectContaining({ institutionId: 2, role: "admin", email: "admin@colegio.test", passwordHash: expect.stringMatching(/^scrypt\$/) }));
+  });
+
+  it("asigna una cuenta existente sin cambiarla de institución global", async () => {
+    mocks.getUserByEmail.mockResolvedValueOnce({ id: 44, name: "Cuenta existente", email: "existente@test.local", role: "teacher" });
+    const owner = appRouter.createCaller(context("admin", true));
+    await expect(owner.institutions.createAdmin({ institutionId: 2, name: "Cuenta existente", email: "existente@test.local", password: "Segura123" })).resolves.toEqual({ id: 44, created: false });
+    expect(mocks.addInstitutionMembership).toHaveBeenCalledWith({ institutionId: 2, userId: 44, role: "admin" });
   });
 });

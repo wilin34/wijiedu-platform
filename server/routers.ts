@@ -24,6 +24,10 @@ async function hashPassword(password: string) {
   return `scrypt$${salt}$${hash.toString("hex")}`;
 }
 
+function isPlatformOwner(user: { openId?: string | null; email?: string | null; role?: string }) {
+  return user.role === "admin" && (user.openId === ENV.ownerOpenId || user.email?.trim().toLowerCase() === "wilinton@gmail.com");
+}
+
 async function passwordMatches(password: string, savedHash: string) {
   const [algorithm, salt, saved] = savedHash.split("$");
   if (algorithm !== "scrypt" || !salt || !saved) return false;
@@ -94,18 +98,33 @@ export const appRouter = router({
   institutions: router({
     mine: protectedProcedure.query(({ ctx }) => db.listInstitutionsForUser(ctx.user.id)),
     list: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.openId !== ENV.ownerOpenId) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede gestionar instituciones." });
+      if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede gestionar instituciones." });
       return db.listInstitutions();
     }),
+    admins: protectedProcedure.input(z.object({ institutionId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede consultar administradores institucionales." });
+      return db.listInstitutionAdmins(input.institutionId);
+    }),
     create: protectedProcedure.input(z.object({ name: z.string().trim().min(3).max(180), slug: z.string().trim().min(3).max(80).regex(/^[a-z0-9-]+$/) })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.openId !== ENV.ownerOpenId) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede crear instituciones." });
+      if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede crear instituciones." });
       return { id: await db.createInstitution(input) };
     }),
     addMember: protectedProcedure.input(z.object({ institutionId: z.number().int().positive(), userId: z.number().int().positive(), role: z.enum(["admin", "teacher", "student"]) })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.openId !== ENV.ownerOpenId) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede asignar miembros." });
+      if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede asignar miembros." });
       await db.addInstitutionMembership(input);
       return { success: true };
     }),
+    createAdmin: protectedProcedure.input(localAccountInput.extend({ institutionId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede crear administradores institucionales." });
+      const existing = await db.getUserByEmail(input.email);
+      if (existing) {
+        await db.addInstitutionMembership({ institutionId: input.institutionId, userId: existing.id, role: "admin" });
+        return { id: existing.id, created: false };
+      }
+      const created = await db.createLocalUser({ name: input.name, email: input.email, passwordHash: await hashPassword(input.password), role: "admin", institutionId: input.institutionId });
+      return { id: created?.id, created: true };
+    }),
+
   }),
   notifications: router({
     list: protectedProcedure.query(({ ctx }) => db.listNotificationsForUser(ctx.user.id, ctx.institutionId ?? 1)),
