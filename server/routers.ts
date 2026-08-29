@@ -1,10 +1,9 @@
 import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
-import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { z } from "zod";
 import * as db from "./db";
-import { sendPasswordResetEmail } from "./email";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { createLocalSession } from "./_core/localSession";
 import { systemRouter } from "./_core/systemRouter";
@@ -37,16 +36,9 @@ async function passwordMatches(password: string, savedHash: string) {
   return expected.length === derived.length && timingSafeEqual(expected, derived);
 }
 
-function hashResetToken(token: string) {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-const RESET_COOKIE_NAME = "wijiedu_password_reset";
-const resetMessage = "Si el correo corresponde a una cuenta, se generó un enlace de recuperación de un solo uso.";
-
 function publicUser(user: NonNullable<Awaited<ReturnType<typeof db.getUserById>>>) {
   const owner = user.openId === ENV.ownerOpenId;
-  return { id: user.id, name: user.name ?? (owner ? "Wilinton" : null), email: user.email ?? (owner ? "wilinton@gmail.com" : null), role: owner ? "admin" as const : user.role };
+  return { id: user.id, name: user.name ?? (owner ? "Wilinton" : null), email: user.email ?? (owner ? "wilinton@gmail.com" : null), role: owner ? "admin" as const : user.role, mustChangePassword: user.mustChangePassword === 1 };
 }
 
 export const appRouter = router({
@@ -82,20 +74,21 @@ export const appRouter = router({
     }),
     requestPasswordReset: publicProcedure.input(z.object({ email: z.string().trim().toLowerCase().email().max(320) })).mutation(async ({ input }) => {
       const user = await db.getUserByEmail(input.email);
-      if (user?.passwordHash && user.email) {
-        const token = randomBytes(32).toString("base64url");
-        await db.createPasswordResetToken(user.id, hashResetToken(token), new Date(Date.now() + 30 * 60 * 1000));
-        await sendPasswordResetEmail({ to: user.email, token });
+      if (user) {
+        const institutionId = await db.getInstitutionForUser(user.id);
+        const request = await db.createRecoveryRequest({ institutionId, userId: user.id });
+        if (request?.status === "pending") {
+          const admins = await db.listInstitutionAdmins(institutionId);
+          await Promise.all(admins.filter(admin => admin.id !== user.id).map(admin => db.createNotification({ userId: admin.id, institutionId, type: "system", title: "Solicitud de recuperación de contraseña", message: `${user.name || user.email || "Un usuario"} solicita una nueva contraseña. Revisa la bandeja de usuarios de tu institución.`, href: "?section=users" })));
+        }
       }
-      return { message: resetMessage };
+      return { message: "Tu solicitud fue enviada al administrador de tu institución. Recibirás respuesta en menos de 24 horas." };
     }),
-    resetPassword: publicProcedure.input(z.object({ token: z.string().min(32).max(256), password: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
-      const token = input.token; 
-      const record = await db.getValidPasswordResetToken(hashResetToken(token));
-      if (!record || record.expiresAt.getTime() <= Date.now()) throw new TRPCError({ code: "BAD_REQUEST", message: "El enlace de recuperación no es válido o ya expiró." });
-      await db.updateAccountPassword(record.userId, await hashPassword(input.password));
-      await db.markPasswordResetTokenUsed(record.id);
-      return { success: true, message: "Contraseña actualizada. Ya puedes ingresar al portal." };
+    changePassword: protectedProcedure.input(z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+      const user = await db.getUserById(ctx.user.id);
+      if (!user?.passwordHash || !(await passwordMatches(input.currentPassword, user.passwordHash))) throw new TRPCError({ code: "UNAUTHORIZED", message: "La contraseña temporal no es correcta." });
+      await db.completeRequiredPasswordChange(user.id, await hashPassword(input.newPassword));
+      return { success: true, message: "Contraseña actualizada. Ya puedes continuar." };
     }),
   }),
   institutions: router({

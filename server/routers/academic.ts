@@ -286,6 +286,22 @@ export const academicRouter = router({
       const user = await db.createLocalUser({ name: input.name, email: input.email.toLowerCase(), passwordHash: await hashAccountPassword(input.password), role: input.role, institutionId: ctx.institutionId ?? 1 });
       return { id: user?.id };
     }),
+    recoveryRequests: protectedProcedure.query(async ({ ctx }) => {
+      assertAdmin(ctx.user);
+      return db.listRecoveryRequests(ctx.institutionId ?? 1);
+    }),
+    resolveRecovery: protectedProcedure.input(z.object({ requestId: z.number().int().positive(), userId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx.user);
+      const institutionId = ctx.institutionId ?? 1;
+      const target = await db.getUserByIdInInstitution(input.userId, institutionId);
+      if (!target) throw new TRPCError({ code: "NOT_FOUND", message: "La cuenta no pertenece a esta institución." });
+      const temporaryPassword = `Wj-${randomBytes(9).toString("base64url")}`;
+      const updated = await db.setTemporaryPassword({ userId: input.userId, institutionId, passwordHash: await hashAccountPassword(temporaryPassword) });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "No fue posible actualizar la cuenta." });
+      await db.resolveRecoveryRequest({ requestId: input.requestId, institutionId, resolvedBy: ctx.user.id });
+      await db.createNotification({ userId: input.userId, institutionId, type: "system", title: "Solicitud de contraseña atendida", message: "El administrador generó una contraseña temporal. Ingresa con ella y cámbiala inmediatamente en el panel de seguridad.", href: "?section=dashboard" });
+      return { temporaryPassword };
+    }),
   }),
 
   students: router({

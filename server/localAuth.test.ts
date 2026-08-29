@@ -6,24 +6,26 @@ const mocks = vi.hoisted(() => ({
   createLocalUser: vi.fn(),
   updateLastSignedIn: vi.fn(),
   createLocalSession: vi.fn(async () => "local-session-token"),
-  createPasswordResetToken: vi.fn(),
-  getValidPasswordResetToken: vi.fn(),
-  updateAccountPassword: vi.fn(),
-  markPasswordResetTokenUsed: vi.fn(),
-  sendPasswordResetEmail: vi.fn(async () => undefined),
+  getInstitutionForUser: vi.fn(async () => 1),
+  createRecoveryRequest: vi.fn(async () => ({ id: 44, institutionId: 1, userId: 15, status: "pending" })),
+  listInstitutionAdmins: vi.fn(async () => [{ id: 21, name: "Admin", email: "admin@test.local", role: "admin" }]),
+  createNotification: vi.fn(),
+  getUserById: vi.fn(),
+  completeRequiredPasswordChange: vi.fn(),
 }));
 
 vi.mock("./db", () => ({
   getUserByEmail: mocks.getUserByEmail,
   createLocalUser: mocks.createLocalUser,
   updateLastSignedIn: mocks.updateLastSignedIn,
-  createPasswordResetToken: mocks.createPasswordResetToken,
-  getValidPasswordResetToken: mocks.getValidPasswordResetToken,
-  updateAccountPassword: mocks.updateAccountPassword,
-  markPasswordResetTokenUsed: mocks.markPasswordResetTokenUsed,
+  getInstitutionForUser: mocks.getInstitutionForUser,
+  createRecoveryRequest: mocks.createRecoveryRequest,
+  listInstitutionAdmins: mocks.listInstitutionAdmins,
+  createNotification: mocks.createNotification,
+  getUserById: mocks.getUserById,
+  completeRequiredPasswordChange: mocks.completeRequiredPasswordChange,
 }));
 vi.mock("./_core/localSession", () => ({ createLocalSession: mocks.createLocalSession }));
-vi.mock("./email", () => ({ sendPasswordResetEmail: mocks.sendPasswordResetEmail }));
 
 const { appRouter } = await import("./routers");
 
@@ -79,40 +81,24 @@ describe("localAuth", () => {
     await expect(appRouter.createCaller(ctx).localAuth.login({ email: "cuenta@wijiedu.test", password: "incorrecta" })).rejects.toMatchObject({ code: "UNAUTHORIZED", message: "Datos incorrectos." });
   });
 
-  it("genera un token de recuperación sin enumerar cuentas", async () => {
+  it("crea una solicitud supervisada y notifica al administrador institucional", async () => {
     mocks.getUserByEmail.mockResolvedValueOnce(localUser);
-    const caller = appRouter.createCaller(context().ctx);
-    const result = await caller.localAuth.requestPasswordReset({ email: localUser.email! });
+    const result = await appRouter.createCaller(context().ctx).localAuth.requestPasswordReset({ email: localUser.email! });
+    expect(result.message).toContain("administrador de tu institución");
+    expect(mocks.createRecoveryRequest).toHaveBeenCalledWith({ institutionId: 1, userId: 15 });
+    expect(mocks.createNotification).toHaveBeenCalledWith(expect.objectContaining({ userId: 21, institutionId: 1, type: "system" }));
+  });
 
-    expect(result.message).toContain("Si el correo corresponde");
-    expect(result).toEqual({ message: result.message });
-    expect(mocks.createPasswordResetToken).toHaveBeenCalledWith(15, expect.any(String), expect.any(Date));
-    expect(mocks.sendPasswordResetEmail).toHaveBeenCalledWith(expect.objectContaining({ to: localUser.email, token: expect.any(String) }));
-
+  it("mantiene el mismo mensaje para un correo desconocido", async () => {
     mocks.getUserByEmail.mockResolvedValueOnce(undefined);
-    const unknown = await caller.localAuth.requestPasswordReset({ email: "no-existe@wijiedu.test" });
-    expect(unknown).toEqual({ message: result.message });
+    const result = await appRouter.createCaller(context().ctx).localAuth.requestPasswordReset({ email: "no-existe@wijiedu.test" });
+    expect(result.message).toContain("administrador de tu institución");
   });
 
-  it("cambia la contraseña, incrementa la sesión y consume el token", async () => {
-    mocks.getValidPasswordResetToken.mockResolvedValueOnce({ id: 44, userId: 15, expiresAt: new Date(Date.now() + 60_000), usedAt: null });
+  it("rechaza el cambio protegido sin la contraseña temporal correcta", async () => {
+    mocks.getUserById.mockResolvedValueOnce({ ...localUser, passwordHash: "scrypt$abc$0011" });
     const { ctx } = context();
-    const result = await appRouter.createCaller(ctx).localAuth.resetPassword({ token: "token-de-prueba-12345678901234567890", password: "NuevaSegura123" });
-
-    expect(result.success).toBe(true);
-    expect(mocks.updateAccountPassword).toHaveBeenCalledWith(15, expect.stringMatching(/^scrypt\$/));
-    expect(mocks.markPasswordResetTokenUsed).toHaveBeenCalledWith(44);
-  });
-
-  it("rechaza el cambio de contraseña si no se presenta el token del correo", async () => {
-    mocks.updateAccountPassword.mockClear();
-    await expect(appRouter.createCaller(context().ctx).localAuth.resetPassword({ token: "", password: "NuevaSegura123" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    expect(mocks.updateAccountPassword).not.toHaveBeenCalled();
-  });
-
-  it("rechaza tokens de recuperación expirados", async () => {
-    mocks.getValidPasswordResetToken.mockResolvedValueOnce({ id: 45, userId: 15, expiresAt: new Date(Date.now() - 1), usedAt: null });
-    const { ctx } = context();
-    await expect(appRouter.createCaller(ctx).localAuth.resetPassword({ token: "token-de-prueba-12345678901234567890", password: "NuevaSegura123" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ctx.user = localUser;
+    await expect(appRouter.createCaller(ctx).localAuth.changePassword({ currentPassword: "incorrecta", newPassword: "NuevaSegura123" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 });

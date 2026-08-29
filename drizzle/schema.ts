@@ -47,6 +47,7 @@ export const users = mysqlTable(
     loginMethod: varchar("loginMethod", { length: 64 }),
     passwordHash: varchar("passwordHash", { length: 255 }),
     sessionVersion: int("sessionVersion").default(0).notNull(),
+    mustChangePassword: int("mustChangePassword").default(0).notNull(),
     role: mysqlEnum("role", ["admin", "teacher", "student", "user"]).default("student").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -300,19 +301,19 @@ export type Message = typeof messages.$inferSelect;
 export type LiveClass = typeof liveClasses.$inferSelect;
 
 
-export const passwordResetTokens = mysqlTable(
-  "password_reset_tokens",
+export const recoveryRequests = mysqlTable(
+  "recovery_requests",
   {
     id: int("id").autoincrement().primaryKey(),
-    userId: int("user_id").notNull(),
-    tokenHash: varchar("token_hash", { length: 128 }).notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    usedAt: timestamp("used_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    institutionId: int("institutionId").notNull(),
+    userId: int("userId").notNull(),
+    status: mysqlEnum("status", ["pending", "resolved", "cancelled"]).default("pending").notNull(),
+    requestedAt: timestamp("requestedAt").defaultNow().notNull(),
+    resolvedAt: timestamp("resolvedAt"),
+    resolvedBy: int("resolvedBy"),
   },
-  table => ({ tokenHashUnique: uniqueIndex("password_reset_tokens_hash_unique").on(table.tokenHash) })
+  table => ({ pendingUnique: uniqueIndex("recovery_requests_pending_unique").on(table.institutionId, table.userId, table.status) })
 );
-
 
 export const notifications = mysqlTable("notifications", {
   id: int("id").autoincrement().primaryKey(),

@@ -18,7 +18,7 @@ import {
   moduleAssessments,
   notificationPreferences,
   notifications,
-  passwordResetTokens,
+  recoveryRequests,
   students,
   subjects,
   submissions,
@@ -99,7 +99,6 @@ export async function deleteInstitution(institutionId: number) {
       if (!administrator.email || administrator.email.toLowerCase() === "wilinton@gmail.com") continue;
       const remaining = await tx.select({ id: institutionMemberships.id }).from(institutionMemberships).where(eq(institutionMemberships.userId, administrator.userId)).limit(1);
       if (!remaining.length) {
-        await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, administrator.userId));
         await tx.delete(users).where(eq(users.id, administrator.userId));
       }
     }
@@ -223,9 +222,37 @@ export async function createLocalUser(input: { name: string; email: string; pass
   return getUserById(userId);
 }
 
+export async function createRecoveryRequest(input: { institutionId: number; userId: number }) {
+  const db = await requireDb();
+  const existing = await db.select().from(recoveryRequests).where(and(eq(recoveryRequests.institutionId, input.institutionId), eq(recoveryRequests.userId, input.userId), eq(recoveryRequests.status, "pending"))).limit(1);
+  if (existing[0]) return existing[0];
+  const result = await db.insert(recoveryRequests).values(input);
+  const [created] = await db.select().from(recoveryRequests).where(eq(recoveryRequests.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+export async function listRecoveryRequests(institutionId: number) {
+  const db = await requireDb();
+  return db.select({ id: recoveryRequests.id, institutionId: recoveryRequests.institutionId, userId: recoveryRequests.userId, status: recoveryRequests.status, requestedAt: recoveryRequests.requestedAt, resolvedAt: recoveryRequests.resolvedAt, resolvedBy: recoveryRequests.resolvedBy, name: users.name, email: users.email, role: users.role }).from(recoveryRequests).innerJoin(users, eq(users.id, recoveryRequests.userId)).where(eq(recoveryRequests.institutionId, institutionId)).orderBy(desc(recoveryRequests.requestedAt));
+}
+export async function resolveRecoveryRequest(input: { requestId: number; institutionId: number; resolvedBy: number }) {
+  const db = await requireDb();
+  await db.update(recoveryRequests).set({ status: "resolved", resolvedAt: new Date(), resolvedBy: input.resolvedBy }).where(and(eq(recoveryRequests.id, input.requestId), eq(recoveryRequests.institutionId, input.institutionId), eq(recoveryRequests.status, "pending")));
+}
+
 export async function updateLastSignedIn(userId: number) {
   const db = await requireDb();
   await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, userId));
+}
+export async function setTemporaryPassword(input: { userId: number; institutionId: number; passwordHash: string }) {
+  const db = await requireDb();
+  const member = await getUserByIdInInstitution(input.userId, input.institutionId);
+  if (!member) return false;
+  await db.update(users).set({ passwordHash: input.passwordHash, mustChangePassword: 1, sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, input.userId));
+  return true;
+}
+export async function completeRequiredPasswordChange(userId: number, passwordHash: string) {
+  const db = await requireDb();
+  await db.update(users).set({ passwordHash, mustChangePassword: 0, sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId));
 }
 
 export async function listUsers(institutionId = 1) {
@@ -1105,22 +1132,6 @@ export async function getDashboardStats(user: { id: number; role: string; email?
 }
 
 
-
-export async function createPasswordResetToken(userId: number, tokenHash: string, expiresAt: Date) {
-  const db = await requireDb();
-  await db.insert(passwordResetTokens).values({ userId, tokenHash, expiresAt });
-}
-
-export async function getValidPasswordResetToken(tokenHash: string) {
-  const db = await requireDb();
-  const result = await db.select().from(passwordResetTokens).where(and(eq(passwordResetTokens.tokenHash, tokenHash), isNull(passwordResetTokens.usedAt))).limit(1);
-  return result[0];
-}
-
-export async function markPasswordResetTokenUsed(tokenId: number) {
-  const db = await requireDb();
-  await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, tokenId));
-}
 
 export async function updateAccountPassword(userId: number, passwordHash: string) {
   const db = await requireDb();

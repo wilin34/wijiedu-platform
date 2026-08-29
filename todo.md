@@ -277,3 +277,20 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Mantener tokens hash, expiración, uso único e invalidación de sesiones.
 - [x] Actualizar la interfaz para informar que debe revisar el correo y no revelar si una cuenta existe.
 - [x] Añadir pruebas de correo requerido, token no reutilizable y rechazo de cambios no verificados.
+
+## Incidencia 403 de correo
+
+- [x] Identificar si el 403 proviene de permisos de la API, dominio remitente o configuración de Resend.
+- [x] Evitar persistir tokens de recuperación cuando el envío del correo falla.
+- [x] Exponer un mensaje operativo claro y mantener la respuesta segura ante fallos del proveedor.
+- [x] Añadir pruebas del manejo de errores 403 y publicar la corrección.
+
+## Recuperación supervisada por institución
+
+- [x] Sustituir el restablecimiento automático por solicitudes de recuperación institucionales.
+- [x] Notificar al administrador de la institución correcta y mantener aislamiento por tenant.
+- [x] Añadir panel administrativo para revisar solicitudes y generar contraseña temporal.
+- [x] Marcar la cuenta para exigir cambio de contraseña en el primer ingreso.
+- [x] Bloquear el portal del estudiante/docente hasta completar el cambio obligatorio.
+- [x] Eliminar el flujo automático por correo, sus tokens y sus controles asociados.
+- [x] Añadir migración, pruebas de autorización, aislamiento y primer ingreso.
