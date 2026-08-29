@@ -374,7 +374,7 @@ export const academicRouter = router({
     create: protectedProcedure.input(z.object({ studentId: z.number().int().positive(), subjectId: z.number().int().positive(), period: z.string().trim().min(1).max(60), title: z.string().trim().min(2).max(220), score: z.number().int().min(0).max(1000), maxScore: z.number().int().min(1).max(1000).default(100), notes: z.string().trim().max(5000).nullable().optional() })).mutation(async ({ ctx, input }) => {
       if (!isStaff(ctx.user)) forbid();
       await assertSubjectManager(ctx.user, input.subjectId, ctx.institutionId ?? 1);
-      if (!(await db.isStudentEnrolled(input.studentId, input.subjectId))) throw new TRPCError({ code: "BAD_REQUEST", message: "El estudiante no está inscrito en esta materia." });
+      if (!(await db.isStudentEnrolled(input.studentId, input.subjectId, ctx.institutionId ?? 1))) throw new TRPCError({ code: "BAD_REQUEST", message: "El estudiante no está inscrito en esta materia." });
       return { id: await db.createGrade({ ...input, gradedBy: ctx.user.id, institutionId: ctx.institutionId ?? 1 }) };
     }),
     update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: z.object({ period: z.string().trim().min(1).max(60), title: z.string().trim().min(2).max(220), score: z.number().int().min(0).max(1000), maxScore: z.number().int().min(1).max(1000), notes: z.string().trim().max(5000).nullable().optional() }) })).mutation(async ({ ctx, input }) => {
@@ -398,11 +398,11 @@ export const academicRouter = router({
     submit: protectedProcedure.input(z.object({ activityId: z.number().int().positive(), content: z.string().trim().max(5000).nullable().optional(), attachment: fileInput.nullable().optional() })).mutation(async ({ ctx, input }) => {
       if (isStaff(ctx.user)) forbid("Solo los estudiantes pueden entregar actividades.");
       const student = await ownStudent(ctx.user, ctx.institutionId ?? 1);
-      const activity = await db.getActivityById(input.activityId);
+      const activity = await db.getActivityById(input.activityId, ctx.institutionId ?? 1);
       if (!activity || activity.status !== "published") throw new TRPCError({ code: "NOT_FOUND", message: "La actividad no está disponible para entregar." });
-      if (!(await db.isStudentEnrolled(student.id, activity.subjectId))) forbid("No estás inscrito en la materia de esta actividad.");
+      if (!(await db.isStudentEnrolled(student.id, activity.subjectId, ctx.institutionId ?? 1))) forbid("No estás inscrito en la materia de esta actividad.");
       const uploaded = await uploadAttachment(ctx.user.id, input.attachment, "submissions");
-      await db.createSubmission({ activityId: input.activityId, studentId: student.id, content: input.content, fileKey: uploaded.resourceFileKey, fileUrl: uploaded.resourceFileUrl });
+      await db.createSubmission({ activityId: input.activityId, studentId: student.id, institutionId: ctx.institutionId ?? 1, content: input.content, fileKey: uploaded.resourceFileKey, fileUrl: uploaded.resourceFileUrl });
       return { success: true };
     }),
     grade: protectedProcedure.input(z.object({ id: z.number().int().positive(), score: z.number().int().min(0).max(1000), feedback: z.string().trim().max(5000).nullable().optional() })).mutation(async ({ ctx, input }) => {
@@ -449,7 +449,7 @@ export const academicRouter = router({
       const assessment = await db.getModuleAssessmentById(input.assessmentId, ctx.institutionId ?? 1);
       if (!assessment || assessment.status !== "published") throw new TRPCError({ code: "NOT_FOUND", message: "La evaluación no está disponible." });
       const courseModule = await db.getCourseModuleById(assessment.moduleId, ctx.institutionId ?? 1);
-      if (!courseModule || !(await db.isStudentEnrolled(student.id, courseModule.subjectId))) forbid("No estás inscrito en la materia de esta evaluación.");
+      if (!courseModule || !(await db.isStudentEnrolled(student.id, courseModule.subjectId, ctx.institutionId ?? 1))) forbid("No estás inscrito en la materia de esta evaluación.");
       const answerMap = new Map(input.answers.map(answer => [answer.questionId, answer.selectedOption]));
       const score = assessment.questions.reduce((total, question) => total + (answerMap.get(question.id) === question.correctOption ? 1 : 0), 0);
       const maxScore = assessment.questions.length;
@@ -478,7 +478,7 @@ export const academicRouter = router({
       const lesson = await db.getCourseLessonById(input.lessonId, ctx.institutionId ?? 1);
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lección no encontrada." });
       const courseModule = await db.getCourseModuleById(lesson.moduleId, ctx.institutionId ?? 1);
-      if (!courseModule || !(await db.isStudentEnrolled(student.id, courseModule.subjectId))) forbid("No estás inscrito en la materia de esta lección.");
+      if (!courseModule || !(await db.isStudentEnrolled(student.id, courseModule.subjectId, ctx.institutionId ?? 1))) forbid("No estás inscrito en la materia de esta lección.");
       await db.setLessonCompletion({ ...input, studentId: student.id });
       return { success: true };
     }),

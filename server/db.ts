@@ -451,12 +451,12 @@ export async function listEnrollmentsForSubject(subjectId: number, institutionId
     .orderBy(students.fullName);
 }
 
-export async function isStudentEnrolled(studentId: number, subjectId: number) {
+export async function isStudentEnrolled(studentId: number, subjectId: number, institutionId = 1) {
   const db = await requireDb();
   const result = await db
     .select({ id: enrollments.id })
     .from(enrollments)
-    .where(and(eq(enrollments.studentId, studentId), eq(enrollments.subjectId, subjectId)))
+    .where(and(eq(enrollments.studentId, studentId), eq(enrollments.subjectId, subjectId), eq(enrollments.institutionId, institutionId)))
     .limit(1);
   return Boolean(result[0]);
 }
@@ -856,6 +856,7 @@ export async function getSubmissionById(submissionId: number, institutionId = 1)
 export async function createSubmission(input: {
   activityId: number;
   studentId: number;
+  institutionId?: number;
   content?: string | null;
   fileKey?: string | null;
   fileUrl?: string | null;
@@ -863,7 +864,7 @@ export async function createSubmission(input: {
   const db = await requireDb();
   await db
     .insert(submissions)
-    .values({ ...input, status: "pending", submittedAt: new Date() })
+    .values({ ...input, institutionId: input.institutionId ?? 1, status: "pending", submittedAt: new Date() })
     .onDuplicateKeyUpdate({
       set: { content: input.content ?? null, fileKey: input.fileKey ?? null, fileUrl: input.fileUrl ?? null, status: "pending", submittedAt: new Date(), score: null, feedback: null, gradedBy: null, gradedAt: null },
     });
