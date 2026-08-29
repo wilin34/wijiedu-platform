@@ -339,5 +339,5 @@ export const notificationPreferences = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => ({ userUnique: uniqueIndex("notification_preferences_user_unique").on(table.userId) })
+  table => ({ userInstitutionUnique: uniqueIndex("notification_preferences_user_institution_unique").on(table.userId, table.institutionId) })
 );

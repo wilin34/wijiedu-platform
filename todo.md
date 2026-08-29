@@ -268,3 +268,12 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Permitirle crear usuarios, administrar roles y crear instituciones desde el portal.
 - [x] Añadir pruebas de autorización para creación de usuarios e instituciones con la cuenta propietaria.
 - [x] Validar la sesión autenticada de wilinton@gmail.com y publicar la corrección.
+
+## Recuperación segura por correo
+
+- [x] Exigir que las cuentas nuevas tengan un correo válido y normalizado.
+- [x] Impedir que el restablecimiento cambie la contraseña solo con un nombre de usuario.
+- [x] Enviar el enlace de recuperación a la dirección registrada mediante un proveedor de correo configurado.
+- [x] Mantener tokens hash, expiración, uso único e invalidación de sesiones.
+- [x] Actualizar la interfaz para informar que debe revisar el correo y no revelar si una cuenta existe.
+- [x] Añadir pruebas de correo requerido, token no reutilizable y rechazo de cambios no verificados.

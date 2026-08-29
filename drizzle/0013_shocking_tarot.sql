@@ -1,0 +1,2 @@
+ALTER TABLE `notification_preferences` DROP INDEX `notification_preferences_user_unique`;--> statement-breakpoint
+ALTER TABLE `notification_preferences` ADD CONSTRAINT `notification_preferences_user_institution_unique` UNIQUE(`userId`,`institutionId`);

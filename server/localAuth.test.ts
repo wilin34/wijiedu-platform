@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getValidPasswordResetToken: vi.fn(),
   updateAccountPassword: vi.fn(),
   markPasswordResetTokenUsed: vi.fn(),
+  sendPasswordResetEmail: vi.fn(async () => undefined),
 }));
 
 vi.mock("./db", () => ({
@@ -22,6 +23,7 @@ vi.mock("./db", () => ({
   markPasswordResetTokenUsed: mocks.markPasswordResetTokenUsed,
 }));
 vi.mock("./_core/localSession", () => ({ createLocalSession: mocks.createLocalSession }));
+vi.mock("./email", () => ({ sendPasswordResetEmail: mocks.sendPasswordResetEmail }));
 
 const { appRouter } = await import("./routers");
 
@@ -85,6 +87,7 @@ describe("localAuth", () => {
     expect(result.message).toContain("Si el correo corresponde");
     expect(result).toEqual({ message: result.message });
     expect(mocks.createPasswordResetToken).toHaveBeenCalledWith(15, expect.any(String), expect.any(Date));
+    expect(mocks.sendPasswordResetEmail).toHaveBeenCalledWith(expect.objectContaining({ to: localUser.email, token: expect.any(String) }));
 
     mocks.getUserByEmail.mockResolvedValueOnce(undefined);
     const unknown = await caller.localAuth.requestPasswordReset({ email: "no-existe@wijiedu.test" });
@@ -94,18 +97,22 @@ describe("localAuth", () => {
   it("cambia la contraseña, incrementa la sesión y consume el token", async () => {
     mocks.getValidPasswordResetToken.mockResolvedValueOnce({ id: 44, userId: 15, expiresAt: new Date(Date.now() + 60_000), usedAt: null });
     const { ctx } = context();
-    ctx.req.headers.cookie = "wijiedu_password_reset=token-de-prueba-12345678901234567890";
-    const result = await appRouter.createCaller(ctx).localAuth.resetPassword({ password: "NuevaSegura123" });
+    const result = await appRouter.createCaller(ctx).localAuth.resetPassword({ token: "token-de-prueba-12345678901234567890", password: "NuevaSegura123" });
 
     expect(result.success).toBe(true);
     expect(mocks.updateAccountPassword).toHaveBeenCalledWith(15, expect.stringMatching(/^scrypt\$/));
     expect(mocks.markPasswordResetTokenUsed).toHaveBeenCalledWith(44);
   });
 
+  it("rechaza el cambio de contraseña si no se presenta el token del correo", async () => {
+    mocks.updateAccountPassword.mockClear();
+    await expect(appRouter.createCaller(context().ctx).localAuth.resetPassword({ token: "", password: "NuevaSegura123" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mocks.updateAccountPassword).not.toHaveBeenCalled();
+  });
+
   it("rechaza tokens de recuperación expirados", async () => {
     mocks.getValidPasswordResetToken.mockResolvedValueOnce({ id: 45, userId: 15, expiresAt: new Date(Date.now() - 1), usedAt: null });
     const { ctx } = context();
-    ctx.req.headers.cookie = "wijiedu_password_reset=token-de-prueba-12345678901234567890";
-    await expect(appRouter.createCaller(ctx).localAuth.resetPassword({ password: "NuevaSegura123" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(appRouter.createCaller(ctx).localAuth.resetPassword({ token: "token-de-prueba-12345678901234567890", password: "NuevaSegura123" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

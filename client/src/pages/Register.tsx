@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { Landmark, ArrowLeft, KeyRound } from "lucide-react";
-import React, { FormEvent, useState } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 type Mode = "login" | "reset-request" | "reset-confirm";
@@ -11,6 +11,11 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [resetToken, setResetToken] = useState(() => typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("resetToken") || "");
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("resetToken") || "";
+    if (token) { setResetToken(token); setMode("reset-confirm"); }
+  }, []);
 
   const register = trpc.localAuth.register.useMutation({
     onSuccess: () => { toast.success("Cuenta creada. Bienvenido a WijiEdu."); window.location.href = "/"; },
@@ -23,7 +28,7 @@ export default function Register() {
   const requestReset = trpc.localAuth.requestPasswordReset.useMutation({
     onSuccess: data => {
       toast.success(data.message);
-      setMode("reset-confirm");
+      setMode("reset-request");
     },
     onError: error => toast.error(error.message),
   });
@@ -32,6 +37,7 @@ export default function Register() {
       toast.success(data.message);
       setPassword("");
       setMode("login");
+      setResetToken("");
       window.history.replaceState({}, "", "/registro");
     },
     onError: error => toast.error(error.message),
@@ -45,7 +51,8 @@ export default function Register() {
       return;
     }
     if (mode === "reset-confirm") {
-      resetPassword.mutate({ password });
+      if (!resetToken) { toast.error("Abre el enlace enviado a tu correo para cambiar la contraseña."); return; }
+      resetPassword.mutate({ token: resetToken, password });
       return;
     }
     login.mutate({ email, password });

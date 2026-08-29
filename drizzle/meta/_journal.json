@@ -92,6 +92,13 @@
       "when": 1788022613357,
       "tag": "0012_magenta_smiling_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1788028703597,
+      "tag": "0013_shocking_tarot",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } fr
 import { promisify } from "node:util";
 import { z } from "zod";
 import * as db from "./db";
+import { sendPasswordResetEmail } from "./email";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { createLocalSession } from "./_core/localSession";
 import { systemRouter } from "./_core/systemRouter";
@@ -79,20 +80,21 @@ export const appRouter = router({
       ctx.res.cookie(COOKIE_NAME, await createLocalSession(user), { ...getSessionCookieOptions(ctx.req), maxAge: 7 * 24 * 60 * 60 * 1000 });
       return publicUser(user);
     }),
-    requestPasswordReset: publicProcedure.input(z.object({ email: z.string().trim().toLowerCase().email().max(320) })).mutation(async ({ ctx, input }) => {
+    requestPasswordReset: publicProcedure.input(z.object({ email: z.string().trim().toLowerCase().email().max(320) })).mutation(async ({ input }) => {
       const user = await db.getUserByEmail(input.email);
-      const token = randomBytes(32).toString("base64url");
-      if (user?.passwordHash) await db.createPasswordResetToken(user.id, hashResetToken(token), new Date(Date.now() + 30 * 60 * 1000));
-      ctx.res.cookie(RESET_COOKIE_NAME, token, { httpOnly: true, secure: ctx.req.protocol === "https", sameSite: "lax", maxAge: 30 * 60 * 1000, path: "/" });
+      if (user?.passwordHash && user.email) {
+        const token = randomBytes(32).toString("base64url");
+        await db.createPasswordResetToken(user.id, hashResetToken(token), new Date(Date.now() + 30 * 60 * 1000));
+        await sendPasswordResetEmail({ to: user.email, token });
+      }
       return { message: resetMessage };
     }),
-    resetPassword: publicProcedure.input(z.object({ password: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
-      const token = ctx.req.headers.cookie?.split(";").map(value => value.trim()).find(value => value.startsWith(`${RESET_COOKIE_NAME}=`))?.slice(RESET_COOKIE_NAME.length + 1);
-      const record = token ? await db.getValidPasswordResetToken(hashResetToken(decodeURIComponent(token))) : undefined;
+    resetPassword: publicProcedure.input(z.object({ token: z.string().min(32).max(256), password: z.string().min(8).max(128) })).mutation(async ({ ctx, input }) => {
+      const token = input.token; 
+      const record = await db.getValidPasswordResetToken(hashResetToken(token));
       if (!record || record.expiresAt.getTime() <= Date.now()) throw new TRPCError({ code: "BAD_REQUEST", message: "El enlace de recuperación no es válido o ya expiró." });
       await db.updateAccountPassword(record.userId, await hashPassword(input.password));
       await db.markPasswordResetTokenUsed(record.id);
-      ctx.res.clearCookie(RESET_COOKIE_NAME, { httpOnly: true, secure: ctx.req.protocol === "https", sameSite: "lax", path: "/" });
       return { success: true, message: "Contraseña actualizada. Ya puedes ingresar al portal." };
     }),
   }),
