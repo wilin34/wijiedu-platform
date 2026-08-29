@@ -66,6 +66,47 @@ export async function createInstitution(input: { name: string; slug: string }) {
   return Number(result[0].insertId);
 }
 
+export async function deleteInstitution(institutionId: number) {
+  if (institutionId === 1) throw new Error("La institución principal no se puede eliminar.");
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    const administrators = await tx.select({ userId: institutionMemberships.userId, email: users.email })
+      .from(institutionMemberships)
+      .innerJoin(users, eq(users.id, institutionMemberships.userId))
+      .where(and(eq(institutionMemberships.institutionId, institutionId), eq(institutionMemberships.role, "admin")));
+
+    await tx.delete(moduleAssessmentAttempts).where(eq(moduleAssessmentAttempts.institutionId, institutionId));
+    await tx.delete(lessonProgress).where(eq(lessonProgress.institutionId, institutionId));
+    await tx.delete(submissions).where(eq(submissions.institutionId, institutionId));
+    await tx.delete(messages).where(eq(messages.institutionId, institutionId));
+    await tx.delete(notifications).where(eq(notifications.institutionId, institutionId));
+    await tx.delete(notificationPreferences).where(eq(notificationPreferences.institutionId, institutionId));
+    await tx.delete(enrollments).where(eq(enrollments.institutionId, institutionId));
+    await tx.delete(grades).where(eq(grades.institutionId, institutionId));
+    await tx.delete(liveClasses).where(eq(liveClasses.institutionId, institutionId));
+    await tx.delete(activities).where(eq(activities.institutionId, institutionId));
+    await tx.delete(moduleAssessments).where(eq(moduleAssessments.institutionId, institutionId));
+    await tx.delete(courseLessons).where(eq(courseLessons.institutionId, institutionId));
+    await tx.delete(courseModules).where(eq(courseModules.institutionId, institutionId));
+    await tx.delete(courseResources).where(eq(courseResources.institutionId, institutionId));
+    await tx.delete(competencies).where(eq(competencies.institutionId, institutionId));
+    await tx.delete(subjects).where(eq(subjects.institutionId, institutionId));
+    await tx.delete(students).where(eq(students.institutionId, institutionId));
+    await tx.delete(institutionMemberships).where(eq(institutionMemberships.institutionId, institutionId));
+    await tx.delete(institutions).where(eq(institutions.id, institutionId));
+
+    for (const administrator of administrators) {
+      if (!administrator.email || administrator.email.toLowerCase() === "wilinton@gmail.com") continue;
+      const remaining = await tx.select({ id: institutionMemberships.id }).from(institutionMemberships).where(eq(institutionMemberships.userId, administrator.userId)).limit(1);
+      if (!remaining.length) {
+        await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, administrator.userId));
+        await tx.delete(users).where(eq(users.id, administrator.userId));
+      }
+    }
+    return { success: true };
+  });
+}
+
 export async function listInstitutionsForUser(userId: number) {
   const db = await requireDb();
   return db.select({ id: institutions.id, name: institutions.name, slug: institutions.slug, role: institutionMemberships.role })

@@ -109,6 +109,12 @@ export const appRouter = router({
       if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede crear instituciones." });
       return { id: await db.createInstitution(input) };
     }),
+    remove: protectedProcedure.input(z.object({ institutionId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede eliminar instituciones." });
+      if (input.institutionId === 1) throw new TRPCError({ code: "BAD_REQUEST", message: "La institución principal no se puede eliminar." });
+      await db.deleteInstitution(input.institutionId);
+      return { success: true };
+    }),
     addMember: protectedProcedure.input(z.object({ institutionId: z.number().int().positive(), userId: z.number().int().positive(), role: z.enum(["admin", "teacher", "student"]) })).mutation(async ({ ctx, input }) => {
       if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede asignar miembros." });
       await db.addInstitutionMembership(input);

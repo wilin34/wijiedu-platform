@@ -235,3 +235,10 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Permitir a docentes editar, publicar y eliminar únicamente sus clases autorizadas.
 - [x] Actualizar la interfaz para mostrar acciones Meet a docentes con materia asignada.
 - [x] Probar permisos positivos, acceso cruzado y responsive del flujo docente.
+
+## Control y eliminación de instituciones
+
+- [x] Ocultar la sección Instituciones a administradores de instituciones creadas.
+- [x] Permitir al propietario eliminar instituciones creadas, junto con sus administradores y datos asociados.
+- [x] Proteger la institución principal y evitar eliminaciones cruzadas o no autorizadas.
+- [x] Probar permisos, limpieza de datos y actualización del contexto institucional tras eliminar.

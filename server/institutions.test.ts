@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   listInstitutionsForUser: vi.fn(async (userId: number) => userId === 7 ? [{ id: 1, name: "Institución A", slug: "institucion-a", role: "admin" }] : []),
   listInstitutions: vi.fn(async () => [{ id: 1, name: "Institución A", slug: "institucion-a", status: "active" }]),
   createInstitution: vi.fn(async () => 2),
+  deleteInstitution: vi.fn(async (institutionId: number) => { if (institutionId === 1) throw new Error("La institución principal no se puede eliminar."); return { success: true }; }),
   addInstitutionMembership: vi.fn(),
   getUserByEmail: vi.fn(async () => undefined),
   createLocalUser: vi.fn(async () => ({ id: 12, name: "Admin Institucional", email: "admin@institucion.test", role: "admin" })),
@@ -44,6 +45,15 @@ describe("institutions", () => {
     await expect(admin.institutions.create({ name: "Institución B", slug: "institucion-b" })).resolves.toEqual({ id: 2 });
     await expect(admin.institutions.addMember({ institutionId: 2, userId: 9, role: "teacher" })).resolves.toEqual({ success: true });
     expect(mocks.addInstitutionMembership).toHaveBeenCalledWith({ institutionId: 2, userId: 9, role: "teacher" });
+  });
+
+  it("solo permite al propietario eliminar instituciones creadas y protege la principal", async () => {
+    const institutionalAdmin = appRouter.createCaller(context("admin"));
+    await expect(institutionalAdmin.institutions.remove({ institutionId: 2 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    const owner = appRouter.createCaller(context("admin", true));
+    await expect(owner.institutions.remove({ institutionId: 1 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(owner.institutions.remove({ institutionId: 2 })).resolves.toEqual({ success: true });
+    expect(mocks.deleteInstitution).toHaveBeenCalledWith(2);
   });
 
   it("permite al propietario crear un administrador institucional con credenciales locales", async () => {
