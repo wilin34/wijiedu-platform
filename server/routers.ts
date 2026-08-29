@@ -9,6 +9,7 @@ import { createLocalSession } from "./_core/localSession";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { academicRouter } from "./routers/academic";
+import { ENV } from "./_core/env";
 
 const scrypt = promisify(scryptCallback);
 const localAccountInput = z.object({
@@ -90,16 +91,32 @@ export const appRouter = router({
       return { success: true, message: "Contraseña actualizada. Ya puedes ingresar al portal." };
     }),
   }),
+  institutions: router({
+    mine: protectedProcedure.query(({ ctx }) => db.listInstitutionsForUser(ctx.user.id)),
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.openId !== ENV.ownerOpenId) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede gestionar instituciones." });
+      return db.listInstitutions();
+    }),
+    create: protectedProcedure.input(z.object({ name: z.string().trim().min(3).max(180), slug: z.string().trim().min(3).max(80).regex(/^[a-z0-9-]+$/) })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.openId !== ENV.ownerOpenId) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede crear instituciones." });
+      return { id: await db.createInstitution(input) };
+    }),
+    addMember: protectedProcedure.input(z.object({ institutionId: z.number().int().positive(), userId: z.number().int().positive(), role: z.enum(["admin", "teacher", "student"]) })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.openId !== ENV.ownerOpenId) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede asignar miembros." });
+      await db.addInstitutionMembership(input);
+      return { success: true };
+    }),
+  }),
   notifications: router({
-    list: protectedProcedure.query(({ ctx }) => db.listNotificationsForUser(ctx.user.id)),
-    unreadCount: protectedProcedure.query(({ ctx }) => db.countUnreadNotifications(ctx.user.id)),
-    markRead: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await db.markNotificationRead(ctx.user.id, input.id); return { success: true }; }),
-    markAllRead: protectedProcedure.mutation(async ({ ctx }) => { await db.markAllNotificationsRead(ctx.user.id); return { success: true }; }),
-    preferences: protectedProcedure.query(({ ctx }) => db.getNotificationPreferences(ctx.user.id)),
-    updatePreferences: protectedProcedure.input(z.object({ academicEnabled: z.boolean(), assessmentEnabled: z.boolean(), liveClassEnabled: z.boolean(), messageEnabled: z.boolean() })).mutation(async ({ ctx, input }) => { await db.updateNotificationPreferences(ctx.user.id, { academicEnabled: input.academicEnabled ? 1 : 0, assessmentEnabled: input.assessmentEnabled ? 1 : 0, liveClassEnabled: input.liveClassEnabled ? 1 : 0, messageEnabled: input.messageEnabled ? 1 : 0 }); return { success: true }; }),
+    list: protectedProcedure.query(({ ctx }) => db.listNotificationsForUser(ctx.user.id, ctx.institutionId ?? 1)),
+    unreadCount: protectedProcedure.query(({ ctx }) => db.countUnreadNotifications(ctx.user.id, ctx.institutionId ?? 1)),
+    markRead: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await db.markNotificationRead(ctx.user.id, input.id, ctx.institutionId ?? 1); return { success: true }; }),
+    markAllRead: protectedProcedure.mutation(async ({ ctx }) => { await db.markAllNotificationsRead(ctx.user.id, ctx.institutionId ?? 1); return { success: true }; }),
+    preferences: protectedProcedure.query(({ ctx }) => db.getNotificationPreferences(ctx.user.id, ctx.institutionId ?? 1)),
+    updatePreferences: protectedProcedure.input(z.object({ academicEnabled: z.boolean(), assessmentEnabled: z.boolean(), liveClassEnabled: z.boolean(), messageEnabled: z.boolean() })).mutation(async ({ ctx, input }) => { await db.updateNotificationPreferences(ctx.user.id, { academicEnabled: input.academicEnabled ? 1 : 0, assessmentEnabled: input.assessmentEnabled ? 1 : 0, liveClassEnabled: input.liveClassEnabled ? 1 : 0, messageEnabled: input.messageEnabled ? 1 : 0, institutionId: ctx.institutionId ?? 1 }); return { success: true }; }),
     create: protectedProcedure.input(z.object({ userId: z.number().int().positive(), type: z.enum(["academic", "assessment", "live_class", "message", "system"]), title: z.string().trim().min(2).max(220), message: z.string().trim().min(2), href: z.string().max(512).nullable().optional() })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Solo administración puede crear notificaciones." });
-      return { id: await db.createNotification(input) };
+      return { id: await db.createNotification({ ...input, institutionId: ctx.institutionId ?? 1 }) };
     }),
   }),
   academic: academicRouter,

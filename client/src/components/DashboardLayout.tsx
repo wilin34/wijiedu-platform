@@ -5,6 +5,7 @@ import { GraduationCap, Landmark, LogOut, Menu, PanelLeftClose, PanelLeftOpen, t
 import { useState } from "react";
 import { Button } from "./ui/button";
 import NotificationCenter from "./NotificationCenter";
+import InstitutionSwitcher from "./InstitutionSwitcher";
 
 export type WijiNavItem = {
   id: string;
@@ -96,7 +97,8 @@ export default function DashboardLayout({
         <header className="sticky top-0 z-20 flex h-[72px] items-center gap-3 border-b border-[#42463F] bg-[#171A17]/95 px-4 backdrop-blur lg:px-8">
           <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-[#B8BBB2] hover:bg-[#343A33] hover:text-white lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Abrir menú"><Menu className="h-5 w-5" strokeWidth={1.8} /></button>
           <button className="hidden h-9 w-9 items-center justify-center rounded-xl text-[#B8BBB2] hover:bg-[#343A33] hover:text-white lg:inline-flex" onClick={() => setCollapsed(value => !value)} aria-label="Mostrar u ocultar menú">{collapsed ? <PanelLeftOpen className="h-5 w-5" strokeWidth={1.8} /> : <PanelLeftClose className="h-5 w-5" strokeWidth={1.8} />}</button>
-          <div className="flex-1"><p className="hidden text-[10px] font-bold uppercase tracking-[0.15em] text-[#C9AA68] sm:block">Institución educativa</p><h2 className="font-display text-xl font-bold text-white">{pageTitle}</h2></div>
+          <div className="flex-1"><p className="hidden text-[10px] font-bold uppercase tracking-[0.15em] text-[#C9AA68] sm:block">Espacio institucional</p><h2 className="font-display text-xl font-bold text-white">{pageTitle}</h2></div>
+          <InstitutionSwitcher />
           <NotificationCenter />
           <span className="hidden items-center gap-2 text-xs text-[#B8BBB2] sm:flex"><Landmark className="h-3.5 w-3.5 text-[#D8BF86]" strokeWidth={1.8} />{user.email || "Sesión institucional"}</span>
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#B99757] text-[11px] font-bold text-[#07182B]">{initials}</span>

@@ -3,12 +3,14 @@ import { COOKIE_NAME } from "../../shared/const";
 import type { User } from "../../drizzle/schema";
 import { getSessionCookieOptions } from "./cookies";
 import { authenticateLocalSession } from "./localSession";
+import { getInstitutionForUser } from "../db";
 import { sdk } from "./sdk";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
+  institutionId?: number;
 };
 
 export async function createContext(
@@ -27,9 +29,13 @@ export async function createContext(
     user = null;
   }
 
+  const requestedInstitutionId = Number(opts.req.cookies?.wijiedu_institution || 0) || undefined;
+  const institutionId = user ? await getInstitutionForUser(user.id, requestedInstitutionId) : undefined;
+
   return {
     req: opts.req,
     res: opts.res,
     user,
+    institutionId,
   };
 }

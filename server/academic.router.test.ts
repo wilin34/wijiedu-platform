@@ -5,6 +5,7 @@ const dbMocks = {
   listUsers: vi.fn(async () => [{ id: 4, role: "teacher", name: "Docente" }]),
   updateUserRole: vi.fn(async () => undefined),
   getUserById: vi.fn(async (id: number) => ({ id, role: id === 1 ? "admin" : "teacher", name: "Cuenta" })),
+  getUserByIdInInstitution: vi.fn(async (id: number, institutionId = 1) => institutionId === 2 ? undefined : ({ id, role: id === 1 ? "admin" : "teacher", name: "Cuenta" })),
   deleteUserAccount: vi.fn(async () => undefined),
   getUserByEmail: vi.fn(async () => undefined),
   createLocalUser: vi.fn(async () => ({ id: 19, name: "Cuenta", email: "cuenta@wijiedu.test", role: "teacher" })),
@@ -72,6 +73,12 @@ const subjectData = { code: "MAT-01", name: "Matemáticas", period: "2026-1", st
 const gradeData = { studentId: 5, subjectId: 7, period: "2026-1", title: "Parcial", score: 95 };
 
 describe("router académico", () => {
+  it("rechaza cambios de cuentas fuera del tenant activo", async () => {
+    const admin = appRouter.createCaller({ ...context("admin"), institutionId: 2 });
+    await expect(admin.academic.users.setRole({ userId: 4, role: "teacher" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(admin.academic.users.remove({ userId: 4 })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
   it("solo permite al administrador consultar cuentas y gestionar estudiantes", async () => {
     const admin = appRouter.createCaller(context("admin"));
     await expect(admin.academic.users.list()).resolves.toHaveLength(1);

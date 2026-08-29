@@ -9,6 +9,31 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 
+export const institutions = mysqlTable(
+  "institutions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    name: varchar("name", { length: 180 }).notNull(),
+    slug: varchar("slug", { length: 80 }).notNull(),
+    status: mysqlEnum("status", ["active", "suspended"]).default("active").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({ slugUnique: uniqueIndex("institutions_slug_unique").on(table.slug) })
+);
+
+export const institutionMemberships = mysqlTable(
+  "institution_memberships",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    institutionId: int("institutionId").default(1).notNull(),
+    userId: int("userId").notNull(),
+    role: mysqlEnum("role", ["admin", "teacher", "student"]).default("student").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({ membershipUnique: uniqueIndex("institution_memberships_unique").on(table.institutionId, table.userId) })
+);
+
 export const users = mysqlTable(
   "users",
   {
@@ -31,6 +56,7 @@ export const students = mysqlTable(
   "students",
   {
     id: int("id").autoincrement().primaryKey(),
+    institutionId: int("institutionId").default(1).notNull(),
     userId: int("userId"),
     fullName: varchar("fullName", { length: 180 }).notNull(),
     email: varchar("email", { length: 320 }).notNull(),
@@ -43,7 +69,7 @@ export const students = mysqlTable(
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
   table => ({
-    emailUnique: uniqueIndex("students_email_unique").on(table.email),
+    emailUnique: uniqueIndex("students_institution_email_unique").on(table.institutionId, table.email),
     userUnique: uniqueIndex("students_user_unique").on(table.userId),
   })
 );
@@ -52,6 +78,7 @@ export const subjects = mysqlTable(
   "subjects",
   {
     id: int("id").autoincrement().primaryKey(),
+    institutionId: int("institutionId").default(1).notNull(),
     code: varchar("code", { length: 32 }).notNull(),
     name: varchar("name", { length: 180 }).notNull(),
     description: text("description"),
@@ -62,11 +89,12 @@ export const subjects = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => ({ codeUnique: uniqueIndex("subjects_code_unique").on(table.code) })
+  table => ({ codeUnique: uniqueIndex("subjects_institution_code_unique").on(table.institutionId, table.code) })
 );
 
 export const courseResources = mysqlTable("course_resources", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   subjectId: int("subjectId").notNull(),
   title: varchar("title", { length: 220 }).notNull(),
   description: text("description"),
@@ -78,6 +106,7 @@ export const courseResources = mysqlTable("course_resources", {
 
 export const competencies = mysqlTable("competencies", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   subjectId: int("subjectId").notNull(),
   title: varchar("title", { length: 220 }).notNull(),
   description: text("description"),
@@ -87,6 +116,7 @@ export const competencies = mysqlTable("competencies", {
 
 export const courseModules = mysqlTable("course_modules", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   subjectId: int("subjectId").notNull(),
   title: varchar("title", { length: 220 }).notNull(),
   overview: text("overview").notNull(),
@@ -100,6 +130,7 @@ export const courseModules = mysqlTable("course_modules", {
 
 export const courseLessons = mysqlTable("course_lessons", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   moduleId: int("moduleId").notNull(),
   title: varchar("title", { length: 220 }).notNull(),
   summary: text("summary").notNull(),
@@ -112,6 +143,7 @@ export const courseLessons = mysqlTable("course_lessons", {
 
 export const moduleAssessments = mysqlTable("module_assessments", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   moduleId: int("moduleId").notNull(),
   title: varchar("title", { length: 220 }).notNull(),
   description: text("description").notNull(),
@@ -125,6 +157,7 @@ export const moduleAssessments = mysqlTable("module_assessments", {
 
 export const moduleAssessmentAttempts = mysqlTable("module_assessment_attempts", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   assessmentId: int("assessmentId").notNull(),
   studentId: int("studentId").notNull(),
   answers: text("answers").notNull(),
@@ -138,6 +171,7 @@ export const lessonProgress = mysqlTable(
   "lesson_progress",
   {
     id: int("id").autoincrement().primaryKey(),
+    institutionId: int("institutionId").default(1).notNull(),
     lessonId: int("lessonId").notNull(),
     studentId: int("studentId").notNull(),
     completedAt: timestamp("completedAt").defaultNow().notNull(),
@@ -149,6 +183,7 @@ export const enrollments = mysqlTable(
   "enrollments",
   {
     id: int("id").autoincrement().primaryKey(),
+    institutionId: int("institutionId").default(1).notNull(),
     studentId: int("studentId").notNull(),
     subjectId: int("subjectId").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -163,6 +198,7 @@ export const enrollments = mysqlTable(
 
 export const activities = mysqlTable("activities", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   subjectId: int("subjectId").notNull(),
   createdBy: int("createdBy").notNull(),
   title: varchar("title", { length: 220 }).notNull(),
@@ -180,6 +216,7 @@ export const submissions = mysqlTable(
   "submissions",
   {
     id: int("id").autoincrement().primaryKey(),
+    institutionId: int("institutionId").default(1).notNull(),
     activityId: int("activityId").notNull(),
     studentId: int("studentId").notNull(),
     content: text("content"),
@@ -202,6 +239,7 @@ export const submissions = mysqlTable(
 
 export const grades = mysqlTable("grades", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   studentId: int("studentId").notNull(),
   subjectId: int("subjectId").notNull(),
   period: varchar("period", { length: 60 }).notNull(),
@@ -217,6 +255,7 @@ export const grades = mysqlTable("grades", {
 
 export const messages = mysqlTable("messages", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   subjectId: int("subjectId").notNull(),
   senderId: int("senderId").notNull(),
   recipientId: int("recipientId").notNull(),
@@ -227,6 +266,7 @@ export const messages = mysqlTable("messages", {
 
 export const liveClasses = mysqlTable("live_classes", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   subjectId: int("subjectId").notNull(),
   title: varchar("title", { length: 220 }).notNull(),
   description: text("description"),
@@ -272,6 +312,7 @@ export const passwordResetTokens = mysqlTable(
 
 export const notifications = mysqlTable("notifications", {
   id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").default(1).notNull(),
   userId: int("userId").notNull(),
   type: mysqlEnum("type", ["academic", "assessment", "live_class", "message", "system"]).default("system").notNull(),
   title: varchar("title", { length: 220 }).notNull(),
@@ -285,6 +326,7 @@ export const notificationPreferences = mysqlTable(
   "notification_preferences",
   {
     id: int("id").autoincrement().primaryKey(),
+    institutionId: int("institutionId").default(1).notNull(),
     userId: int("userId").notNull(),
     academicEnabled: int("academicEnabled").default(1).notNull(),
     assessmentEnabled: int("assessmentEnabled").default(1).notNull(),

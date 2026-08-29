@@ -189,3 +189,19 @@ No se deben registrar contraseñas ni tokens en texto plano en respuestas, logs 
 - [x] Publicar la implementación final de recuperación.
 
 No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuario.
+
+## Plataforma multiinstitución
+
+- [x] Modelar instituciones, membresías y administradores institucionales.
+- [x] Añadir selección de institución y acceso diferenciado para cada institución.
+- [ ] Aplicar aislamiento por institución a usuarios, estudiantes, docentes y datos académicos.
+- [ ] Aislar clases, actividades, entregas, calificaciones, mensajes, notificaciones y recursos.
+- [x] Crear administración de instituciones para el propietario de WijiEdu.
+- [ ] Verificar con pruebas que una institución no pueda consultar ni modificar datos de otra.
+- [ ] Validar la experiencia responsive de acceso y cambio de institución.
+
+## Endurecimiento multiinstitución
+
+- [ ] Validar institutionId en todas las mutaciones y consultas por ID de usuarios, estudiantes, materias, actividades, clases, calificaciones, entregas y mensajes.
+- [x] Aislar notificaciones por institución en persistencia, listado y lectura, incluyendo usuarios con múltiples membresías.
+- [x] Separar la autorización del propietario de la plataforma de la administración institucional para la gestión global.

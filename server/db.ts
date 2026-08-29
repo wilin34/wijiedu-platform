@@ -1,4 +1,4 @@
-import { and, avg, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, avg, count, desc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   activities,
@@ -9,6 +9,8 @@ import {
   enrollments,
   grades,
   InsertUser,
+  institutionMemberships,
+  institutions,
   liveClasses,
   lessonProgress,
   messages,
@@ -53,6 +55,39 @@ function readStringArray(value: string) {
   }
 }
 
+export async function listInstitutions() {
+  const db = await requireDb();
+  return db.select().from(institutions).orderBy(asc(institutions.name));
+}
+
+export async function createInstitution(input: { name: string; slug: string }) {
+  const db = await requireDb();
+  const result = await db.insert(institutions).values({ name: input.name, slug: input.slug, status: "active" });
+  return Number(result[0].insertId);
+}
+
+export async function listInstitutionsForUser(userId: number) {
+  const db = await requireDb();
+  return db.select({ id: institutions.id, name: institutions.name, slug: institutions.slug, role: institutionMemberships.role })
+    .from(institutionMemberships)
+    .innerJoin(institutions, eq(institutions.id, institutionMemberships.institutionId))
+    .where(and(eq(institutionMemberships.userId, userId), eq(institutions.status, "active")))
+    .orderBy(asc(institutions.name));
+}
+
+export async function getInstitutionForUser(userId: number, requestedInstitutionId?: number) {
+  const db = await requireDb();
+  const conditions = [eq(institutionMemberships.userId, userId), eq(institutions.status, "active")];
+  if (requestedInstitutionId) conditions.push(eq(institutionMemberships.institutionId, requestedInstitutionId));
+  const [membership] = await db.select({ institutionId: institutionMemberships.institutionId }).from(institutionMemberships).innerJoin(institutions, eq(institutions.id, institutionMemberships.institutionId)).where(and(...conditions)).orderBy(asc(institutionMemberships.institutionId)).limit(1);
+  return membership?.institutionId ?? 1;
+}
+
+export async function addInstitutionMembership(input: { institutionId: number; userId: number; role: "admin" | "teacher" | "student" }) {
+  const db = await requireDb();
+  await db.insert(institutionMemberships).values(input).onDuplicateKeyUpdate({ set: { role: input.role } });
+}
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await requireDb();
@@ -87,13 +122,19 @@ export async function getUserById(userId: number) {
   return result[0];
 }
 
+export async function getUserByIdInInstitution(userId: number, institutionId = 1) {
+  const db = await requireDb();
+  const result = await db.select({ user: users }).from(users).innerJoin(institutionMemberships, eq(institutionMemberships.userId, users.id)).where(and(eq(users.id, userId), eq(institutionMemberships.institutionId, institutionId))).limit(1);
+  return result[0]?.user;
+}
+
 export async function getUserByEmail(email: string) {
   const db = await requireDb();
   const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
   return result[0];
 }
 
-export async function createLocalUser(input: { name: string; email: string; passwordHash: string; role?: "admin" | "teacher" | "student" }) {
+export async function createLocalUser(input: { name: string; email: string; passwordHash: string; role?: "admin" | "teacher" | "student"; institutionId?: number }) {
   const db = await requireDb();
   const openId = `local_${crypto.randomUUID().replace(/-/g, "")}`;
   const result = await db.insert(users).values({
@@ -106,8 +147,10 @@ export async function createLocalUser(input: { name: string; email: string; pass
     lastSignedIn: new Date(),
   });
   const userId = Number(result[0].insertId);
+  const institutionId = input.institutionId ?? 1;
+  await db.insert(institutionMemberships).values({ institutionId, userId, role: input.role === "admin" ? "admin" : input.role ?? "student" });
   if ((input.role ?? "student") === "student") {
-    await db.insert(students).values({ userId, fullName: input.name, email: input.email, status: "active" });
+    await db.insert(students).values({ institutionId, userId, fullName: input.name, email: input.email, status: "active" });
   }
   return getUserById(userId);
 }
@@ -117,9 +160,13 @@ export async function updateLastSignedIn(userId: number) {
   await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, userId));
 }
 
-export async function listUsers() {
+export async function listUsers(institutionId = 1) {
   const db = await requireDb();
-  return db.select().from(users).orderBy(desc(users.createdAt));
+  return db.select({ id: users.id, openId: users.openId, name: users.name, email: users.email, loginMethod: users.loginMethod, role: users.role, createdAt: users.createdAt, updatedAt: users.updatedAt, lastSignedIn: users.lastSignedIn })
+    .from(users)
+    .innerJoin(institutionMemberships, eq(institutionMemberships.userId, users.id))
+    .where(eq(institutionMemberships.institutionId, institutionId))
+    .orderBy(desc(users.createdAt));
 }
 
 export async function updateUserRole(userId: number, role: "admin" | "teacher" | "student") {
@@ -156,12 +203,12 @@ export async function deleteUserAccount(userId: number) {
   await db.delete(users).where(eq(users.id, userId));
 }
 
-export async function listStudents() {
+export async function listStudents(institutionId = 1) {
   const db = await requireDb();
-  return db.select().from(students).orderBy(desc(students.createdAt));
+  return db.select().from(students).where(eq(students.institutionId, institutionId)).orderBy(desc(students.createdAt));
 }
 
-export async function listStudentsForTeacher(teacherId: number) {
+export async function listStudentsForTeacher(teacherId: number, institutionId = 1) {
   const db = await requireDb();
   return db
     .selectDistinct({
@@ -180,7 +227,7 @@ export async function listStudentsForTeacher(teacherId: number) {
     .from(students)
     .innerJoin(enrollments, eq(enrollments.studentId, students.id))
     .innerJoin(subjects, eq(subjects.id, enrollments.subjectId))
-    .where(eq(subjects.teacherId, teacherId))
+    .where(and(eq(subjects.teacherId, teacherId), eq(subjects.institutionId, institutionId), eq(students.institutionId, institutionId), eq(enrollments.institutionId, institutionId)))
     .orderBy(desc(students.createdAt));
 }
 
@@ -190,12 +237,12 @@ export async function getStudentById(studentId: number) {
   return result[0];
 }
 
-export async function getStudentForUser(userId: number, email?: string | null) {
+export async function getStudentForUser(userId: number, email?: string | null, institutionId = 1) {
   const db = await requireDb();
   const condition = email
     ? or(eq(students.userId, userId), eq(students.email, email))
     : eq(students.userId, userId);
-  const result = await db.select().from(students).where(condition).limit(1);
+  const result = await db.select().from(students).where(and(condition, eq(students.institutionId, institutionId))).limit(1);
   return result[0];
 }
 
@@ -207,10 +254,12 @@ export async function createStudent(input: {
   phone?: string | null;
   guardianName?: string | null;
   status?: "active" | "inactive";
+  institutionId?: number;
 }) {
   const db = await requireDb();
   const result = await db.insert(students).values({
     ...input,
+    institutionId: input.institutionId ?? 1,
     birthDate: input.birthDate ? new Date(input.birthDate) : null,
     status: input.status ?? "active",
   });
@@ -244,13 +293,14 @@ export async function deleteStudent(studentId: number) {
   await db.delete(students).where(eq(students.id, studentId));
 }
 
-export async function listSubjectsForUser(user: { id: number; role: string; email?: string | null }) {
+export async function listSubjectsForUser(user: { id: number; role: string; email?: string | null; institutionId?: number }) {
   const db = await requireDb();
-  if (user.role === "admin") return db.select().from(subjects).orderBy(desc(subjects.createdAt));
+  const institutionId = user.institutionId ?? 1;
+  if (user.role === "admin") return db.select().from(subjects).where(eq(subjects.institutionId, institutionId)).orderBy(desc(subjects.createdAt));
   if (user.role === "teacher") {
-    return db.select().from(subjects).where(eq(subjects.teacherId, user.id)).orderBy(desc(subjects.createdAt));
+    return db.select().from(subjects).where(and(eq(subjects.teacherId, user.id), eq(subjects.institutionId, institutionId))).orderBy(desc(subjects.createdAt));
   }
-  const student = await getStudentForUser(user.id, user.email);
+  const student = await getStudentForUser(user.id, user.email, institutionId);
   if (!student) return [];
   return db
     .select({
@@ -267,13 +317,13 @@ export async function listSubjectsForUser(user: { id: number; role: string; emai
     })
     .from(subjects)
     .innerJoin(enrollments, eq(enrollments.subjectId, subjects.id))
-    .where(eq(enrollments.studentId, student.id))
+    .where(and(eq(enrollments.studentId, student.id), eq(subjects.institutionId, institutionId), eq(enrollments.institutionId, institutionId)))
     .orderBy(desc(subjects.createdAt));
 }
 
-export async function getSubjectById(subjectId: number) {
+export async function getSubjectById(subjectId: number, institutionId = 1) {
   const db = await requireDb();
-  const result = await db.select().from(subjects).where(eq(subjects.id, subjectId)).limit(1);
+  const result = await db.select().from(subjects).where(and(eq(subjects.id, subjectId), eq(subjects.institutionId, institutionId))).limit(1);
   return result[0];
 }
 
@@ -284,9 +334,10 @@ export async function createSubject(input: {
   period: string;
   teacherId?: number | null;
   color?: string;
+  institutionId?: number;
 }) {
   const db = await requireDb();
-  const result = await db.insert(subjects).values({ ...input, active: 1, color: input.color ?? "#4F8EF7" });
+  const result = await db.insert(subjects).values({ ...input, institutionId: input.institutionId ?? 1, active: 1, color: input.color ?? "#4F8EF7" });
   return Number(result[0].insertId);
 }
 
@@ -311,19 +362,21 @@ export async function createSubjectWithCurriculum(input: {
     assessment?: { title: string; description: string; questions: AssessmentQuestion[]; passingScore: number };
   }>;
   createdBy: number;
+  institutionId?: number;
 }) {
-  const subjectId = await createSubject(input);
+  const institutionId = input.institutionId ?? 1;
+  const subjectId = await createSubject({ ...input, institutionId });
   for (const studentId of input.studentIds ?? []) await enrollStudent(studentId, subjectId);
-  for (const resource of input.resources ?? []) await createCourseResource({ ...resource, subjectId, createdBy: input.createdBy });
-  for (const competency of input.competencies ?? []) await createCompetency({ ...competency, subjectId });
+  for (const resource of input.resources ?? []) await createCourseResource({ ...resource, subjectId, createdBy: input.createdBy, institutionId });
+  for (const competency of input.competencies ?? []) await createCompetency({ ...competency, subjectId, institutionId });
   for (let moduleIndex = 0; moduleIndex < (input.modules ?? []).length; moduleIndex += 1) {
     const courseModule = (input.modules ?? [])[moduleIndex];
-    const moduleId = await createCourseModule({ ...courseModule, subjectId, sortOrder: moduleIndex + 1 });
+    const moduleId = await createCourseModule({ ...courseModule, subjectId, sortOrder: moduleIndex + 1, institutionId });
     for (let lessonIndex = 0; lessonIndex < courseModule.lessons.length; lessonIndex += 1) {
       const lesson = courseModule.lessons[lessonIndex];
-      await createCourseLesson({ ...lesson, moduleId, sortOrder: lessonIndex + 1 });
+      await createCourseLesson({ ...lesson, moduleId, sortOrder: lessonIndex + 1, institutionId });
     }
-    if (courseModule.assessment) await createModuleAssessment({ ...courseModule.assessment, moduleId, status: "published", createdBy: input.createdBy });
+    if (courseModule.assessment) await createModuleAssessment({ ...courseModule.assessment, moduleId, status: "published", createdBy: input.createdBy, institutionId });
   }
   return subjectId;
 }
@@ -405,12 +458,13 @@ export async function isStudentEnrolled(studentId: number, subjectId: number) {
   return Boolean(result[0]);
 }
 
-export async function canAccessSubject(user: { id: number; role: string; email?: string | null }, subjectId: number) {
-  if (user.role === "admin") return true;
-  const subject = await getSubjectById(subjectId);
+export async function canAccessSubject(user: { id: number; role: string; email?: string | null; institutionId?: number }, subjectId: number) {
+  const institutionId = user.institutionId ?? 1;
+  const subject = await getSubjectById(subjectId, institutionId);
   if (!subject) return false;
+  if (user.role === "admin") return true;
   if (user.role === "teacher") return subject.teacherId === user.id;
-  const student = await getStudentForUser(user.id, user.email);
+  const student = await getStudentForUser(user.id, user.email, institutionId);
   return Boolean(student && await isStudentEnrolled(student.id, subjectId));
 }
 
@@ -426,9 +480,10 @@ export async function createCourseResource(input: {
   resourceType: "link" | "document" | "video" | "reading";
   url?: string | null;
   createdBy: number;
+  institutionId?: number;
 }) {
   const db = await requireDb();
-  const result = await db.insert(courseResources).values(input);
+  const result = await db.insert(courseResources).values({ ...input, institutionId: input.institutionId ?? 1 });
   return Number(result[0].insertId);
 }
 
@@ -442,9 +497,10 @@ export async function createCompetency(input: {
   title: string;
   description?: string | null;
   level: "basic" | "intermediate" | "advanced";
+  institutionId?: number;
 }) {
   const db = await requireDb();
-  const result = await db.insert(competencies).values(input);
+  const result = await db.insert(competencies).values({ ...input, institutionId: input.institutionId ?? 1 });
   return Number(result[0].insertId);
 }
 
@@ -457,9 +513,10 @@ export async function createCourseModule(input: {
   imageUrl?: string | null;
   imagePrompt?: string | null;
   sortOrder: number;
+  institutionId?: number;
 }) {
   const db = await requireDb();
-  const result = await db.insert(courseModules).values({ ...input, learningObjectives: JSON.stringify(input.learningObjectives) });
+  const result = await db.insert(courseModules).values({ ...input, institutionId: input.institutionId ?? 1, learningObjectives: JSON.stringify(input.learningObjectives) });
   return Number(result[0].insertId);
 }
 
@@ -471,9 +528,10 @@ export async function createCourseLesson(input: {
   keyTopics: string[];
   classActivity?: string | null;
   sortOrder: number;
+  institutionId?: number;
 }) {
   const db = await requireDb();
-  const result = await db.insert(courseLessons).values({ ...input, keyTopics: JSON.stringify(input.keyTopics) });
+  const result = await db.insert(courseLessons).values({ ...input, institutionId: input.institutionId ?? 1, keyTopics: JSON.stringify(input.keyTopics) });
   return Number(result[0].insertId);
 }
 
@@ -513,12 +571,12 @@ function readAssessmentQuestions(value: string): AssessmentQuestion[] {
   }
 }
 
-export async function createModuleAssessment(input: { moduleId: number; title: string; description: string; questions: AssessmentQuestion[]; passingScore: number; status: "draft" | "published"; createdBy: number }) {
+export async function createModuleAssessment(input: { moduleId: number; title: string; description: string; questions: AssessmentQuestion[]; passingScore: number; status: "draft" | "published"; createdBy: number; institutionId?: number }) {
   const db = await requireDb();
-  const result = await db.insert(moduleAssessments).values({ ...input, questions: JSON.stringify(input.questions) });
+  const result = await db.insert(moduleAssessments).values({ ...input, institutionId: input.institutionId ?? 1, questions: JSON.stringify(input.questions) });
   if (input.status === "published") {
     const [module] = await db.select({ subjectId: courseModules.subjectId }).from(courseModules).where(eq(courseModules.id, input.moduleId)).limit(1);
-    if (module) await notifySubjectStudents(module.subjectId, "assessment", "Nueva evaluación disponible", input.title, `/materias/${module.subjectId}`);
+    if (module) await notifySubjectStudents(module.subjectId, "assessment", "Nueva evaluación disponible", input.title, `/materias/${module.subjectId}`, input.institutionId ?? 1);
   }
   return Number(result[0].insertId);
 }
@@ -591,15 +649,16 @@ export async function listMessagesForUser(subjectId: number, userId: number) {
     .orderBy(messages.createdAt);
 }
 
-export async function createMessage(input: { subjectId: number; senderId: number; recipientId: number; body: string }) {
+export async function createMessage(input: { subjectId: number; senderId: number; recipientId: number; body: string; institutionId?: number }) {
   const db = await requireDb();
-  const result = await db.insert(messages).values(input);
-  await notifyUserIfEnabled(input.recipientId, "message", "Nuevo mensaje académico", "Has recibido un mensaje de tu docente o estudiante.", `/materias/${input.subjectId}`);
+  const result = await db.insert(messages).values({ ...input, institutionId: input.institutionId ?? 1 });
+  await notifyUserIfEnabled(input.recipientId, "message", "Nuevo mensaje académico", "Has recibido un mensaje de tu docente o estudiante.", `/materias/${input.subjectId}`, input.institutionId ?? 1);
   return Number(result[0].insertId);
 }
 
-export async function listActivitiesForUser(user: { id: number; role: string; email?: string | null }) {
+export async function listActivitiesForUser(user: { id: number; role: string; email?: string | null; institutionId?: number }) {
   const db = await requireDb();
+  const institutionId = user.institutionId ?? 1;
   const base = {
     id: activities.id,
     subjectId: activities.subjectId,
@@ -618,19 +677,19 @@ export async function listActivitiesForUser(user: { id: number; role: string; em
     subjectColor: subjects.color,
   };
   if (user.role === "admin") {
-    return db.select(base).from(activities).innerJoin(subjects, eq(subjects.id, activities.subjectId)).orderBy(desc(activities.createdAt));
+    return db.select(base).from(activities).innerJoin(subjects, eq(subjects.id, activities.subjectId)).where(and(eq(activities.institutionId, institutionId), eq(subjects.institutionId, institutionId))).orderBy(desc(activities.createdAt));
   }
   if (user.role === "teacher") {
-    return db.select(base).from(activities).innerJoin(subjects, eq(subjects.id, activities.subjectId)).where(eq(subjects.teacherId, user.id)).orderBy(desc(activities.createdAt));
+    return db.select(base).from(activities).innerJoin(subjects, eq(subjects.id, activities.subjectId)).where(and(eq(subjects.teacherId, user.id), eq(activities.institutionId, institutionId), eq(subjects.institutionId, institutionId))).orderBy(desc(activities.createdAt));
   }
-  const student = await getStudentForUser(user.id, user.email);
+  const student = await getStudentForUser(user.id, user.email, institutionId);
   if (!student) return [];
   return db
     .select(base)
     .from(activities)
     .innerJoin(subjects, eq(subjects.id, activities.subjectId))
     .innerJoin(enrollments, eq(enrollments.subjectId, subjects.id))
-    .where(and(eq(enrollments.studentId, student.id), eq(activities.status, "published")))
+    .where(and(eq(enrollments.studentId, student.id), eq(activities.status, "published"), eq(activities.institutionId, institutionId), eq(subjects.institutionId, institutionId), eq(enrollments.institutionId, institutionId)))
     .orderBy(desc(activities.createdAt));
 }
 
@@ -650,10 +709,11 @@ export async function createActivity(input: {
   status: "draft" | "published" | "closed";
   resourceFileKey?: string | null;
   resourceFileUrl?: string | null;
+  institutionId?: number;
 }) {
   const db = await requireDb();
-  const result = await db.insert(activities).values(input);
-  if (input.status === "published") await notifySubjectStudents(input.subjectId, "academic", "Nueva actividad publicada", input.title, `/materias/${input.subjectId}`);
+  const result = await db.insert(activities).values({ ...input, institutionId: input.institutionId ?? 1 });
+  if (input.status === "published") await notifySubjectStudents(input.subjectId, "academic", "Nueva actividad publicada", input.title, `/materias/${input.subjectId}`, input.institutionId ?? 1);
   return Number(result[0].insertId);
 }
 
@@ -681,8 +741,9 @@ export async function deleteActivity(activityId: number) {
   await db.delete(activities).where(eq(activities.id, activityId));
 }
 
-export async function listGradesForUser(user: { id: number; role: string; email?: string | null }) {
+export async function listGradesForUser(user: { id: number; role: string; email?: string | null; institutionId?: number }) {
   const db = await requireDb();
+  const institutionId = user.institutionId ?? 1;
   const base = {
     id: grades.id,
     studentId: grades.studentId,
@@ -699,11 +760,12 @@ export async function listGradesForUser(user: { id: number; role: string; email?
     subjectCode: subjects.code,
   };
   const query = db.select(base).from(grades).innerJoin(students, eq(students.id, grades.studentId)).innerJoin(subjects, eq(subjects.id, grades.subjectId));
-  if (user.role === "admin") return query.orderBy(desc(grades.gradedAt));
-  if (user.role === "teacher") return query.where(eq(subjects.teacherId, user.id)).orderBy(desc(grades.gradedAt));
-  const student = await getStudentForUser(user.id, user.email);
+  const tenantCondition = and(eq(grades.institutionId, institutionId), eq(students.institutionId, institutionId), eq(subjects.institutionId, institutionId));
+  if (user.role === "admin") return query.where(tenantCondition).orderBy(desc(grades.gradedAt));
+  if (user.role === "teacher") return query.where(and(tenantCondition, eq(subjects.teacherId, user.id))).orderBy(desc(grades.gradedAt));
+  const student = await getStudentForUser(user.id, user.email, institutionId);
   if (!student) return [];
-  return query.where(eq(grades.studentId, student.id)).orderBy(desc(grades.gradedAt));
+  return query.where(and(tenantCondition, eq(grades.studentId, student.id))).orderBy(desc(grades.gradedAt));
 }
 
 export async function getGradeById(gradeId: number) {
@@ -721,9 +783,10 @@ export async function createGrade(input: {
   maxScore: number;
   notes?: string | null;
   gradedBy: number;
+  institutionId?: number;
 }) {
   const db = await requireDb();
-  const result = await db.insert(grades).values(input);
+  const result = await db.insert(grades).values({ ...input, institutionId: input.institutionId ?? 1 });
   return Number(result[0].insertId);
 }
 
@@ -740,8 +803,9 @@ export async function deleteGrade(gradeId: number) {
   await db.delete(grades).where(eq(grades.id, gradeId));
 }
 
-export async function listSubmissionsForUser(user: { id: number; role: string; email?: string | null }) {
+export async function listSubmissionsForUser(user: { id: number; role: string; email?: string | null; institutionId?: number }) {
   const db = await requireDb();
+  const institutionId = user.institutionId ?? 1;
   const base = {
     id: submissions.id,
     activityId: submissions.activityId,
@@ -767,11 +831,12 @@ export async function listSubmissionsForUser(user: { id: number; role: string; e
     .innerJoin(activities, eq(activities.id, submissions.activityId))
     .innerJoin(subjects, eq(subjects.id, activities.subjectId))
     .innerJoin(students, eq(students.id, submissions.studentId));
-  if (user.role === "admin") return query.orderBy(desc(submissions.submittedAt));
-  if (user.role === "teacher") return query.where(eq(subjects.teacherId, user.id)).orderBy(desc(submissions.submittedAt));
-  const student = await getStudentForUser(user.id, user.email);
+  const tenantCondition = and(eq(submissions.institutionId, institutionId), eq(activities.institutionId, institutionId), eq(subjects.institutionId, institutionId), eq(students.institutionId, institutionId));
+  if (user.role === "admin") return query.where(tenantCondition).orderBy(desc(submissions.submittedAt));
+  if (user.role === "teacher") return query.where(and(tenantCondition, eq(subjects.teacherId, user.id))).orderBy(desc(submissions.submittedAt));
+  const student = await getStudentForUser(user.id, user.email, institutionId);
   if (!student) return [];
-  return query.where(eq(submissions.studentId, student.id)).orderBy(desc(submissions.submittedAt));
+  return query.where(and(tenantCondition, eq(submissions.studentId, student.id))).orderBy(desc(submissions.submittedAt));
 }
 
 export async function getSubmissionById(submissionId: number) {
@@ -809,8 +874,9 @@ export async function gradeSubmission(submissionId: number, input: { score: numb
     .where(eq(submissions.id, submissionId));
 }
 
-export async function listLiveClassesForUser(user: { id: number; role: string; email?: string | null }) {
+export async function listLiveClassesForUser(user: { id: number; role: string; email?: string | null; institutionId?: number }) {
   const db = await requireDb();
+  const institutionId = user.institutionId ?? 1;
   const base = {
     id: liveClasses.id,
     subjectId: liveClasses.subjectId,
@@ -826,11 +892,11 @@ export async function listLiveClassesForUser(user: { id: number; role: string; e
     subjectCode: subjects.code,
   };
   const query = db.select(base).from(liveClasses).innerJoin(subjects, eq(subjects.id, liveClasses.subjectId));
-  if (user.role === "admin") return query.orderBy(liveClasses.startsAt);
-  if (user.role === "teacher") return query.where(eq(subjects.teacherId, user.id)).orderBy(liveClasses.startsAt);
-  const student = await getStudentForUser(user.id, user.email);
+  if (user.role === "admin") return query.where(and(eq(liveClasses.institutionId, institutionId), eq(subjects.institutionId, institutionId))).orderBy(liveClasses.startsAt);
+  if (user.role === "teacher") return query.where(and(eq(subjects.teacherId, user.id), eq(liveClasses.institutionId, institutionId), eq(subjects.institutionId, institutionId))).orderBy(liveClasses.startsAt);
+  const student = await getStudentForUser(user.id, user.email, institutionId);
   if (!student) return [];
-  return query.innerJoin(enrollments, eq(enrollments.subjectId, subjects.id)).where(and(eq(enrollments.studentId, student.id), eq(liveClasses.status, "published"))).orderBy(liveClasses.startsAt);
+  return query.innerJoin(enrollments, eq(enrollments.subjectId, subjects.id)).where(and(eq(enrollments.studentId, student.id), eq(liveClasses.status, "published"), eq(liveClasses.institutionId, institutionId), eq(subjects.institutionId, institutionId), eq(enrollments.institutionId, institutionId))).orderBy(liveClasses.startsAt);
 }
 
 export async function getLiveClassById(id: number) {
@@ -848,10 +914,11 @@ export async function createLiveClass(input: {
   durationMinutes: number;
   status: "draft" | "published" | "completed" | "cancelled";
   createdBy: number;
+  institutionId?: number;
 }) {
   const db = await requireDb();
-  const result = await db.insert(liveClasses).values(input);
-  if (input.status === "published") await notifySubjectStudents(input.subjectId, "live_class", "Nueva clase en vivo", input.title, `/clases-en-vivo`);
+  const result = await db.insert(liveClasses).values({ ...input, institutionId: input.institutionId ?? 1 });
+  if (input.status === "published") await notifySubjectStudents(input.subjectId, "live_class", "Nueva clase en vivo", input.title, `/clases-en-vivo`, input.institutionId ?? 1);
   return Number(result[0].insertId);
 }
 
@@ -874,56 +941,56 @@ export async function deleteLiveClass(id: number) {
   await db.delete(liveClasses).where(eq(liveClasses.id, id));
 }
 
-export async function listNotificationsForUser(userId: number, limit = 30) {
+export async function listNotificationsForUser(userId: number, institutionId = 1, limit = 30) {
   const db = await requireDb();
-  return db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(desc(notifications.createdAt)).limit(limit);
+  return db.select().from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.institutionId, institutionId))).orderBy(desc(notifications.createdAt)).limit(limit);
 }
 
-export async function countUnreadNotifications(userId: number) {
+export async function countUnreadNotifications(userId: number, institutionId = 1) {
   const db = await requireDb();
-  const [result] = await db.select({ value: count() }).from(notifications).where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+  const [result] = await db.select({ value: count() }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.institutionId, institutionId), isNull(notifications.readAt)));
   return Number(result?.value ?? 0);
 }
 
-export async function markNotificationRead(userId: number, notificationId: number) {
+export async function markNotificationRead(userId: number, notificationId: number, institutionId = 1) {
   const db = await requireDb();
-  await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
+  await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId), eq(notifications.institutionId, institutionId)));
 }
 
-export async function markAllNotificationsRead(userId: number) {
+export async function markAllNotificationsRead(userId: number, institutionId = 1) {
   const db = await requireDb();
-  await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+  await db.update(notifications).set({ readAt: new Date() }).where(and(eq(notifications.userId, userId), eq(notifications.institutionId, institutionId), isNull(notifications.readAt)));
 }
 
-export async function createNotification(input: { userId: number; type: "academic" | "assessment" | "live_class" | "message" | "system"; title: string; message: string; href?: string | null }) {
+export async function createNotification(input: { userId: number; institutionId?: number; type: "academic" | "assessment" | "live_class" | "message" | "system"; title: string; message: string; href?: string | null }) {
   const db = await requireDb();
-  const result = await db.insert(notifications).values(input);
+  const result = await db.insert(notifications).values({ ...input, institutionId: input.institutionId ?? 1 });
   return Number(result[0].insertId);
 }
 
-async function notifyUserIfEnabled(userId: number, type: "academic" | "assessment" | "live_class" | "message", title: string, message: string, href: string) {
-  const preferences = await getNotificationPreferences(userId);
+async function notifyUserIfEnabled(userId: number, type: "academic" | "assessment" | "live_class" | "message", title: string, message: string, href: string, institutionId = 1) {
+  const preferences = await getNotificationPreferences(userId, institutionId);
   const enabled = type === "academic" ? preferences.academicEnabled : type === "assessment" ? preferences.assessmentEnabled : type === "live_class" ? preferences.liveClassEnabled : preferences.messageEnabled;
-  if (enabled) await createNotification({ userId, type, title, message, href });
+  if (enabled) await createNotification({ userId, institutionId, type, title, message, href });
 }
 
-async function notifySubjectStudents(subjectId: number, type: "academic" | "assessment" | "live_class", title: string, message: string, href: string) {
+async function notifySubjectStudents(subjectId: number, type: "academic" | "assessment" | "live_class", title: string, message: string, href: string, institutionId = 1) {
   const recipients = await listMessageRecipients(subjectId);
-  await Promise.all(recipients.filter(recipient => recipient.role === "student").map(recipient => notifyUserIfEnabled(recipient.id, type, title, message, href)));
+  await Promise.all(recipients.filter(recipient => recipient.role === "student").map(recipient => notifyUserIfEnabled(recipient.id, type, title, message, href, institutionId)));
 }
 
-export async function getNotificationPreferences(userId: number) {
+export async function getNotificationPreferences(userId: number, institutionId = 1) {
   const db = await requireDb();
-  const [existing] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId)).limit(1);
+  const [existing] = await db.select().from(notificationPreferences).where(and(eq(notificationPreferences.userId, userId), eq(notificationPreferences.institutionId, institutionId))).limit(1);
   if (existing) return existing;
-  await db.insert(notificationPreferences).values({ userId });
-  const [created] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId)).limit(1);
+  await db.insert(notificationPreferences).values({ userId, institutionId });
+  const [created] = await db.select().from(notificationPreferences).where(and(eq(notificationPreferences.userId, userId), eq(notificationPreferences.institutionId, institutionId))).limit(1);
   return created;
 }
 
-export async function updateNotificationPreferences(userId: number, input: { academicEnabled: number; assessmentEnabled: number; liveClassEnabled: number; messageEnabled: number }) {
+export async function updateNotificationPreferences(userId: number, input: { academicEnabled: number; assessmentEnabled: number; liveClassEnabled: number; messageEnabled: number; institutionId?: number }) {
   const db = await requireDb();
-  await db.insert(notificationPreferences).values({ userId, ...input }).onDuplicateKeyUpdate({ set: input });
+  await db.insert(notificationPreferences).values({ userId, institutionId: input.institutionId ?? 1, ...input }).onDuplicateKeyUpdate({ set: input });
 }
 
 export async function getDashboardStats(user: { id: number; role: string; email?: string | null }) {
