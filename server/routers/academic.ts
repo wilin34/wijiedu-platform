@@ -299,11 +299,13 @@ export const academicRouter = router({
     }),
     update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: subjectInput.extend({ active: z.boolean() }) })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
+      if (!(await db.getSubjectById(input.id, ctx.institutionId ?? 1))) throw new TRPCError({ code: "NOT_FOUND", message: "Materia no encontrada." });
       await db.updateSubject(input.id, ctx.institutionId ?? 1, input.data);
       return { success: true };
     }),
     remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
+      if (!(await db.getSubjectById(input.id, ctx.institutionId ?? 1))) throw new TRPCError({ code: "NOT_FOUND", message: "Materia no encontrada." });
       await db.deleteSubject(input.id, ctx.institutionId ?? 1);
       return { success: true };
     }),
@@ -319,7 +321,7 @@ export const academicRouter = router({
     }),
     enrollments: protectedProcedure.input(z.object({ subjectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       assertAdmin(ctx.user);
-      return db.listEnrollmentsForSubject(input.subjectId);
+      return db.listEnrollmentsForSubject(input.subjectId, ctx.institutionId ?? 1);
     }),
   }),
 

@@ -433,7 +433,7 @@ export async function removeEnrollment(studentId: number, subjectId: number, ins
   await db.delete(enrollments).where(and(eq(enrollments.studentId, studentId), eq(enrollments.subjectId, subjectId), eq(enrollments.institutionId, institutionId)));
 }
 
-export async function listEnrollmentsForSubject(subjectId: number) {
+export async function listEnrollmentsForSubject(subjectId: number, institutionId = 1) {
   const db = await requireDb();
   return db
     .select({
@@ -446,7 +446,8 @@ export async function listEnrollmentsForSubject(subjectId: number) {
     })
     .from(enrollments)
     .innerJoin(students, eq(students.id, enrollments.studentId))
-    .where(eq(enrollments.subjectId, subjectId))
+    .innerJoin(subjects, eq(subjects.id, enrollments.subjectId))
+    .where(and(eq(enrollments.subjectId, subjectId), eq(enrollments.institutionId, institutionId), eq(students.institutionId, institutionId), eq(subjects.institutionId, institutionId)))
     .orderBy(students.fullName);
 }
 
