@@ -44,7 +44,8 @@ const RESET_COOKIE_NAME = "wijiedu_password_reset";
 const resetMessage = "Si el correo corresponde a una cuenta, se generó un enlace de recuperación de un solo uso.";
 
 function publicUser(user: NonNullable<Awaited<ReturnType<typeof db.getUserById>>>) {
-  return { id: user.id, name: user.name, email: user.email, role: user.role };
+  const owner = user.openId === ENV.ownerOpenId;
+  return { id: user.id, name: user.name ?? (owner ? "Wilinton" : null), email: user.email ?? (owner ? "wilinton@gmail.com" : null), role: owner ? "admin" as const : user.role };
 }
 
 export const appRouter = router({

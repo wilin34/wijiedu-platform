@@ -6,6 +6,7 @@ import * as db from "../db";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
 import { generateImage } from "../_core/imageGeneration";
+import { ENV } from "../_core/env";
 import { protectedProcedure, router } from "../_core/trpc";
 
 type AppUser = { id: number; role: string; email?: string | null };
@@ -240,7 +241,12 @@ async function uploadAttachment(userId: number, attachment?: z.infer<typeof file
 
 export const academicRouter = router({
   profile: router({
-    me: protectedProcedure.query(({ ctx }) => db.getProfileForUser(ctx.user.id, ctx.institutionId ?? 1)),
+    me: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await db.getProfileForUser(ctx.user.id, ctx.institutionId ?? 1);
+      if (profile) return profile;
+      const owner = ctx.user.openId === ENV.ownerOpenId;
+      return { id: ctx.user.id, name: ctx.user.name ?? (owner ? "Wilinton" : ""), email: ctx.user.email ?? (owner ? "wilinton@gmail.com" : ""), phone: ctx.user.phone ?? null, bio: ctx.user.bio ?? null, profilePhotoUrl: ctx.user.profilePhotoUrl ?? null, role: roleForAccess(ctx.user.role), student: null };
+    }),
     uploadPhoto: protectedProcedure.input(fileInput).mutation(async ({ ctx, input }) => {
       if (!input.mimeType.startsWith("image/")) throw new TRPCError({ code: "BAD_REQUEST", message: "La foto debe ser una imagen." });
       const uploaded = await uploadAttachment(ctx.user.id, input, "profiles");

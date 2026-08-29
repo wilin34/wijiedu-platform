@@ -261,3 +261,10 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [ ] Validar una sesión real de administrador institucional con visibilidad limitada.
 - [ ] Validar el cambio real entre dos membresías institucionales en escritorio y móvil.
 - [ ] Esperar configuración de claves Stripe del usuario para implementar pagos, suscripciones y webhooks.
+
+## Corrección de permisos del propietario global
+
+- [x] Reconocer de forma consistente a wilinton@gmail.com como propietario y administrador global.
+- [x] Permitirle crear usuarios, administrar roles y crear instituciones desde el portal.
+- [x] Añadir pruebas de autorización para creación de usuarios e instituciones con la cuenta propietaria.
+- [x] Validar la sesión autenticada de wilinton@gmail.com y publicar la corrección.
