@@ -949,9 +949,9 @@ export async function updateLiveClass(id: number, input: {
   if (existing && input.status === "published" && existing.status !== "published") await notifySubjectStudents(existing.subjectId, "live_class", "Nueva clase en vivo", input.title, `/clases-en-vivo`);
 }
 
-export async function deleteLiveClass(id: number) {
+export async function deleteLiveClass(id: number, institutionId = 1) {
   const db = await requireDb();
-  await db.delete(liveClasses).where(eq(liveClasses.id, id));
+  await db.delete(liveClasses).where(and(eq(liveClasses.id, id), eq(liveClasses.institutionId, institutionId)));
 }
 
 export async function listNotificationsForUser(userId: number, institutionId = 1, limit = 30) {

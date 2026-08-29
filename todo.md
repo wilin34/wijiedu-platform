@@ -228,3 +228,10 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 
 - [x] Asegurar que wilinton@gmail.com tenga rol admin y coincida con la identidad propietaria configurada.
 - [ ] Validar que la cuenta corregida pueda iniciar sesión y ver la sección Instituciones.
+
+## Clases Meet para docentes
+
+- [x] Permitir a docentes crear clases Meet solo para sus propias materias e institución.
+- [x] Permitir a docentes editar, publicar y eliminar únicamente sus clases autorizadas.
+- [x] Actualizar la interfaz para mostrar acciones Meet a docentes con materia asignada.
+- [x] Probar permisos positivos, acceso cruzado y responsive del flujo docente.

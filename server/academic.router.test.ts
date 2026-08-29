@@ -178,6 +178,16 @@ describe("router académico", () => {
     await expect(student.academic.curriculum.generateAssessment({ moduleId: 71 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
+  it("permite al docente asignado gestionar sus propias clases de Meet", async () => {
+    const teacher = appRouter.createCaller(context("teacher", 2));
+    const data = { subjectId: 7, title: "Clase del docente", meetUrl: "https://meet.google.com/abc-defg-hij", startsAt: new Date("2026-08-23T15:00:00.000Z").toISOString(), durationMinutes: 60, status: "published" as const };
+    await expect(teacher.academic.liveClasses.create(data)).resolves.toEqual({ id: 61 });
+    await expect(teacher.academic.liveClasses.update({ id: 61, data: { title: "Clase actualizada", meetUrl: data.meetUrl, startsAt: data.startsAt, durationMinutes: 60, status: "published" } })).resolves.toEqual({ success: true });
+    await expect(teacher.academic.liveClasses.remove({ id: 61 })).resolves.toEqual({ success: true });
+    const otherTeacher = appRouter.createCaller(context("teacher", 9));
+    await expect(otherTeacher.academic.liveClasses.create(data)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("reserva la publicación de clases de Meet para administración y permite su consulta al estudiante", async () => {
     const liveClass = { subjectId: 7, title: "Tutoría en vivo", meetUrl: "https://meet.google.com/abc-defg-hij", startsAt: new Date("2026-08-23T15:00:00.000Z").toISOString(), durationMinutes: 60, status: "published" as const };
     const admin = appRouter.createCaller(context("admin"));

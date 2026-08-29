@@ -352,19 +352,21 @@ export const academicRouter = router({
   liveClasses: router({
     list: protectedProcedure.query(async ({ ctx }) => db.listLiveClassesForUser({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 })),
     create: protectedProcedure.input(liveClassInput).mutation(async ({ ctx, input }) => {
-      assertAdmin(ctx.user);
+      await assertSubjectManager(ctx.user, input.subjectId, ctx.institutionId ?? 1);
       return { id: await db.createLiveClass({ ...input, startsAt: new Date(input.startsAt), createdBy: ctx.user.id, institutionId: ctx.institutionId ?? 1 }) };
     }),
     update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: liveClassInput.omit({ subjectId: true }) })).mutation(async ({ ctx, input }) => {
-      assertAdmin(ctx.user);
       const liveClass = await db.getLiveClassById(input.id, ctx.institutionId ?? 1);
       if (!liveClass) throw new TRPCError({ code: "NOT_FOUND", message: "Clase en vivo no encontrada." });
+      await assertSubjectManager(ctx.user, liveClass.subjectId, ctx.institutionId ?? 1);
       await db.updateLiveClass(input.id, { ...input.data, startsAt: new Date(input.data.startsAt) });
       return { success: true };
     }),
     remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
-      assertAdmin(ctx.user);
-      await db.deleteLiveClass(input.id);
+      const liveClass = await db.getLiveClassById(input.id, ctx.institutionId ?? 1);
+      if (!liveClass) throw new TRPCError({ code: "NOT_FOUND", message: "Clase en vivo no encontrada." });
+      await assertSubjectManager(ctx.user, liveClass.subjectId, ctx.institutionId ?? 1);
+      await db.deleteLiveClass(input.id, ctx.institutionId ?? 1);
       return { success: true };
     }),
   }),
