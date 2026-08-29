@@ -427,8 +427,8 @@ export const academicRouter = router({
     assessments: protectedProcedure.input(z.object({ moduleId: z.number().int().positive() })).query(async ({ ctx, input }) => {
       const courseModule = await db.getCourseModuleById(input.moduleId, ctx.institutionId ?? 1);
       if (!courseModule) throw new TRPCError({ code: "NOT_FOUND", message: "Módulo no encontrado." });
-      if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role) }, courseModule.subjectId))) forbid("No tienes acceso a las evaluaciones de este módulo.");
-      const assessments = await db.listModuleAssessments(input.moduleId, isStaff(ctx.user));
+      if (!(await db.canAccessSubject({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 }, courseModule.subjectId))) forbid("No tienes acceso a las evaluaciones de este módulo.");
+      const assessments = await db.listModuleAssessments(input.moduleId, isStaff(ctx.user), ctx.institutionId ?? 1);
       return isStaff(ctx.user) ? assessments : assessments.filter(assessment => assessment.status === "published");
     }),
     generateAssessment: protectedProcedure.input(z.object({ moduleId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
@@ -462,7 +462,7 @@ export const academicRouter = router({
       const student = await ownStudent(ctx.user, ctx.institutionId ?? 1);
       const modules = await db.listCourseModulesForSubject(input.subjectId);
       const completedLessonIds = (await db.listCompletedLessonsForStudent(student.id, input.subjectId)).map(item => item.lessonId);
-      const assessmentLists = await Promise.all(modules.map(courseModule => db.listModuleAssessments(courseModule.id)));
+      const assessmentLists = await Promise.all(modules.map(courseModule => db.listModuleAssessments(courseModule.id, false, ctx.institutionId ?? 1)));
       const assessments = assessmentLists.flat().filter(assessment => assessment.status === "published");
       const attempts = await db.listAssessmentAttemptsForStudent(student.id, assessments.map(assessment => assessment.id));
       const passedAssessmentIds = Array.from(new Set(attempts.filter(attempt => attempt.passed === 1).map(attempt => attempt.assessmentId)));

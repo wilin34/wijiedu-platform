@@ -583,9 +583,9 @@ export async function createModuleAssessment(input: { moduleId: number; title: s
   return Number(result[0].insertId);
 }
 
-export async function listModuleAssessments(moduleId: number, includeAnswers = false) {
+export async function listModuleAssessments(moduleId: number, includeAnswers = false, institutionId = 1) {
   const db = await requireDb();
-  const assessments = await db.select().from(moduleAssessments).where(eq(moduleAssessments.moduleId, moduleId)).orderBy(desc(moduleAssessments.createdAt));
+  const assessments = await db.select().from(moduleAssessments).where(and(eq(moduleAssessments.moduleId, moduleId), eq(moduleAssessments.institutionId, institutionId))).orderBy(desc(moduleAssessments.createdAt));
   return assessments.map(assessment => ({
     ...assessment,
     questions: readAssessmentQuestions(assessment.questions).map(question => includeAnswers ? question : { id: question.id, prompt: question.prompt, options: question.options }),
