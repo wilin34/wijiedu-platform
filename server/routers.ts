@@ -79,7 +79,7 @@ export const appRouter = router({
         const request = await db.createRecoveryRequest({ institutionId, userId: user.id });
         if (request?.status === "pending") {
           const admins = await db.listInstitutionAdmins(institutionId);
-          await Promise.all(admins.filter(admin => admin.id !== user.id).map(admin => db.createNotification({ userId: admin.id, institutionId, type: "system", title: "Solicitud de recuperación de contraseña", message: `${user.name || user.email || "Un usuario"} solicita una nueva contraseña. Revisa la bandeja de usuarios de tu institución.`, href: "?section=users" })));
+          await Promise.all(admins.filter(admin => admin.id !== user.id).map(admin => db.createNotification({ userId: admin.id, institutionId, type: "system", title: "Solicitud de recuperación de contraseña", message: `${user.name || user.email || "Un usuario"} solicita una nueva contraseña. Revisa la bandeja de usuarios de tu institución.`, href: `/?view=users&requestId=${request.id}` })));
         }
       }
       return { message: "Tu solicitud fue enviada al administrador de tu institución. Recibirás respuesta en menos de 24 horas." };

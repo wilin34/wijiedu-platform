@@ -294,3 +294,12 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Bloquear el portal del estudiante/docente hasta completar el cambio obligatorio.
 - [x] Eliminar el flujo automático por correo, sus tokens y sus controles asociados.
 - [x] Añadir migración, pruebas de autorización, aislamiento y primer ingreso.
+
+## Navegación de solicitudes e informe Excel
+
+- [x] Hacer que la notificación de recuperación abra Usuarios y roles y enfoque la solicitud pendiente correspondiente.
+- [x] Añadir soporte de selección por requestId en la bandeja de solicitudes.
+- [x] Reemplazar la exportación de notas PDF por un libro Excel profesional y descargable.
+- [x] Incluir portada, resumen, detalle de calificaciones, promedios y datos institucionales sin inventar información.
+- [x] Añadir pruebas del exportador Excel y de la navegación desde notificaciones.
+- [x] Validar escritorio/móvil y publicar la versión mejorada.

@@ -86,7 +86,7 @@ describe("localAuth", () => {
     const result = await appRouter.createCaller(context().ctx).localAuth.requestPasswordReset({ email: localUser.email! });
     expect(result.message).toContain("administrador de tu institución");
     expect(mocks.createRecoveryRequest).toHaveBeenCalledWith({ institutionId: 1, userId: 15 });
-    expect(mocks.createNotification).toHaveBeenCalledWith(expect.objectContaining({ userId: 21, institutionId: 1, type: "system" }));
+    expect(mocks.createNotification).toHaveBeenCalledWith(expect.objectContaining({ userId: 21, institutionId: 1, type: "system", href: "/?view=users&requestId=44" }));
   });
 
   it("mantiene el mismo mensaje para un correo desconocido", async () => {
