@@ -327,10 +327,3 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 
 - [x] Hacer idempotente la creación de preferencias de notificación ante solicitudes concurrentes.
 - [x] Repetir la suite completa y confirmar que permisos y branding siguen pasando.
-
-## Animación de navegación institucional
-
-- [x] Añadir overlay de carga al cambiar entre secciones del portal.
-- [x] Mostrar el logo y la paleta de la institución activa en la animación.
-- [x] Respetar prefers-reduced-motion y mantener navegación accesible.
-- [x] Validar transición en escritorio y móvil y publicar la mejora.
