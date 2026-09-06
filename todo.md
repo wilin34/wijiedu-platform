@@ -313,3 +313,12 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Mejorar colores, encabezados, estilos y jerarquía visual del Excel profesional.
 - [x] Añadir pruebas de branding, contraste, exportación y validación responsive.
 - [x] Guardar y publicar la versión mejorada.
+
+## Permisos docentes y branding institucional reforzado
+
+- [x] Permitir actividades, entregas y calificaciones solo al docente asignado de la materia y a estudiantes correspondientes.
+- [x] Impedir al administrador institucional crear actividades o acceder a notas y entregas calificadas.
+- [x] Mantener para el administrador la gestión de usuarios, materias, recursos y configuración institucional.
+- [x] Añadir pruebas positivas y negativas de autorización por rol y materia asignada.
+- [x] Hacer más visible el logo, nombre y colores de la institución activa en navegación, encabezado y superficies principales.
+- [x] Validar responsive, aislamiento institucional y publicar la corrección.

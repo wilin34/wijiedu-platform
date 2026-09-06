@@ -59,9 +59,13 @@ async function hashAccountPassword(password: string) {
 }
 
 async function assertSubjectManager(user: AppUser, subjectId: number, institutionId = 1) {
+  const subject = await db.getSubjectById(subjectId, institutionId);
+  if (!subject || !isTeacher(user) || subject.teacherId !== user.id) forbid("Solo el docente asignado puede administrar actividades, notas y entregas de esta materia.");
+}
+async function assertLiveClassManager(user: AppUser, subjectId: number, institutionId = 1) {
   if (isAdministrator(user)) return;
   const subject = await db.getSubjectById(subjectId, institutionId);
-  if (!subject || !isTeacher(user) || subject.teacherId !== user.id) forbid("Solo el docente asignado puede administrar esta materia.");
+  if (!subject || !isTeacher(user) || subject.teacherId !== user.id) forbid("Solo el docente asignado o el administrador puede gestionar esta clase en vivo.");
 }
 
 async function ownStudent(user: AppUser, institutionId = 1) {
@@ -388,20 +392,20 @@ export const academicRouter = router({
   liveClasses: router({
     list: protectedProcedure.query(async ({ ctx }) => db.listLiveClassesForUser({ ...ctx.user, role: roleForAccess(ctx.user.role), institutionId: ctx.institutionId ?? 1 })),
     create: protectedProcedure.input(liveClassInput).mutation(async ({ ctx, input }) => {
-      await assertSubjectManager(ctx.user, input.subjectId, ctx.institutionId ?? 1);
+      await assertLiveClassManager(ctx.user, input.subjectId, ctx.institutionId ?? 1);
       return { id: await db.createLiveClass({ ...input, startsAt: new Date(input.startsAt), createdBy: ctx.user.id, institutionId: ctx.institutionId ?? 1 }) };
     }),
     update: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: liveClassInput.omit({ subjectId: true }) })).mutation(async ({ ctx, input }) => {
       const liveClass = await db.getLiveClassById(input.id, ctx.institutionId ?? 1);
       if (!liveClass) throw new TRPCError({ code: "NOT_FOUND", message: "Clase en vivo no encontrada." });
-      await assertSubjectManager(ctx.user, liveClass.subjectId, ctx.institutionId ?? 1);
+      await assertLiveClassManager(ctx.user, liveClass.subjectId, ctx.institutionId ?? 1);
       await db.updateLiveClass(input.id, { ...input.data, startsAt: new Date(input.data.startsAt) });
       return { success: true };
     }),
     remove: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const liveClass = await db.getLiveClassById(input.id, ctx.institutionId ?? 1);
       if (!liveClass) throw new TRPCError({ code: "NOT_FOUND", message: "Clase en vivo no encontrada." });
-      await assertSubjectManager(ctx.user, liveClass.subjectId, ctx.institutionId ?? 1);
+      await assertLiveClassManager(ctx.user, liveClass.subjectId, ctx.institutionId ?? 1);
       await db.deleteLiveClass(input.id, ctx.institutionId ?? 1);
       return { success: true };
     }),

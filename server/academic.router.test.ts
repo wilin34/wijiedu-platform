@@ -185,6 +185,18 @@ describe("router académico", () => {
     await expect(student.academic.curriculum.generateAssessment({ moduleId: 71 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
+  it("separa la gestión institucional de la operación académica docente", async () => {
+    const admin = appRouter.createCaller(context("admin", 1));
+    const teacher = appRouter.createCaller(context("teacher", 2));
+    const activity = { subjectId: 7, title: "Actividad docente", description: "Trabajo", dueAt: new Date("2026-09-10T12:00:00.000Z").toISOString(), maxScore: 100, status: "published" as const };
+    await expect(admin.academic.activities.create(activity)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(admin.academic.grades.create(gradeData)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(admin.academic.submissions.grade({ id: 33, score: 90, feedback: "Revisado" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(teacher.academic.activities.create(activity)).resolves.toEqual({ id: 27 });
+    await expect(teacher.academic.grades.create(gradeData)).resolves.toEqual({ id: 31 });
+    await expect(teacher.academic.submissions.grade({ id: 33, score: 90, feedback: "Revisado" })).resolves.toEqual({ success: true });
+  });
+
   it("permite al docente asignado gestionar sus propias clases de Meet", async () => {
     const teacher = appRouter.createCaller(context("teacher", 2));
     const data = { subjectId: 7, title: "Clase del docente", meetUrl: "https://meet.google.com/abc-defg-hij", startsAt: new Date("2026-08-23T15:00:00.000Z").toISOString(), durationMinutes: 60, status: "published" as const };

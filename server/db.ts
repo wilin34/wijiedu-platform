@@ -788,9 +788,7 @@ export async function listActivitiesForUser(user: { id: number; role: string; em
     subjectCode: subjects.code,
     subjectColor: subjects.color,
   };
-  if (user.role === "admin") {
-    return db.select(base).from(activities).innerJoin(subjects, eq(subjects.id, activities.subjectId)).where(and(eq(activities.institutionId, institutionId), eq(subjects.institutionId, institutionId))).orderBy(desc(activities.createdAt));
-  }
+  if (user.role === "admin") return [];
   if (user.role === "teacher") {
     return db.select(base).from(activities).innerJoin(subjects, eq(subjects.id, activities.subjectId)).where(and(eq(subjects.teacherId, user.id), eq(activities.institutionId, institutionId), eq(subjects.institutionId, institutionId))).orderBy(desc(activities.createdAt));
   }
@@ -878,7 +876,7 @@ export async function listGradesForUser(user: { id: number; role: string; email?
   };
   const query = db.select(base).from(grades).innerJoin(students, eq(students.id, grades.studentId)).innerJoin(subjects, eq(subjects.id, grades.subjectId)).leftJoin(users, eq(users.id, subjects.teacherId));
   const tenantCondition = and(eq(grades.institutionId, institutionId), eq(students.institutionId, institutionId), eq(subjects.institutionId, institutionId));
-  if (user.role === "admin") return query.where(tenantCondition).orderBy(desc(grades.gradedAt));
+  if (user.role === "admin") return [];
   if (user.role === "teacher") return query.where(and(tenantCondition, eq(subjects.teacherId, user.id))).orderBy(desc(grades.gradedAt));
   const student = await getStudentForUser(user.id, user.email, institutionId);
   if (!student) return [];
@@ -949,7 +947,7 @@ export async function listSubmissionsForUser(user: { id: number; role: string; e
     .innerJoin(subjects, eq(subjects.id, activities.subjectId))
     .innerJoin(students, eq(students.id, submissions.studentId));
   const tenantCondition = and(eq(submissions.institutionId, institutionId), eq(activities.institutionId, institutionId), eq(subjects.institutionId, institutionId), eq(students.institutionId, institutionId));
-  if (user.role === "admin") return query.where(tenantCondition).orderBy(desc(submissions.submittedAt));
+  if (user.role === "admin") return [];
   if (user.role === "teacher") return query.where(and(tenantCondition, eq(subjects.teacherId, user.id))).orderBy(desc(submissions.submittedAt));
   const student = await getStudentForUser(user.id, user.email, institutionId);
   if (!student) return [];
