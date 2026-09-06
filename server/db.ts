@@ -60,10 +60,15 @@ export async function listInstitutions() {
   return db.select().from(institutions).orderBy(asc(institutions.name));
 }
 
-export async function createInstitution(input: { name: string; slug: string }) {
+export async function createInstitution(input: { name: string; slug: string; logoUrl?: string | null; primaryColor?: string; secondaryColor?: string }) {
   const db = await requireDb();
-  const result = await db.insert(institutions).values({ name: input.name, slug: input.slug, status: "active" });
+  const result = await db.insert(institutions).values({ name: input.name, slug: input.slug, logoUrl: input.logoUrl || null, primaryColor: input.primaryColor || "#B69A5E", secondaryColor: input.secondaryColor || "#1B201D", status: "active" });
   return Number(result[0].insertId);
+}
+
+export async function updateInstitutionBranding(institutionId: number, input: { logoUrl?: string | null; primaryColor?: string; secondaryColor?: string }) {
+  const db = await requireDb();
+  await db.update(institutions).set(input).where(eq(institutions.id, institutionId));
 }
 
 export async function deleteInstitution(institutionId: number) {
@@ -108,7 +113,7 @@ export async function deleteInstitution(institutionId: number) {
 
 export async function listInstitutionsForUser(userId: number) {
   const db = await requireDb();
-  return db.select({ id: institutions.id, name: institutions.name, slug: institutions.slug, role: institutionMemberships.role })
+  return db.select({ id: institutions.id, name: institutions.name, slug: institutions.slug, logoUrl: institutions.logoUrl, primaryColor: institutions.primaryColor, secondaryColor: institutions.secondaryColor, role: institutionMemberships.role })
     .from(institutionMemberships)
     .innerJoin(institutions, eq(institutions.id, institutionMemberships.institutionId))
     .where(and(eq(institutionMemberships.userId, userId), eq(institutions.status, "active")))

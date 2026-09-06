@@ -10,6 +10,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { academicRouter } from "./routers/academic";
 import { ENV } from "./_core/env";
+import { storagePut } from "./storage";
 
 const scrypt = promisify(scryptCallback);
 const localAccountInput = z.object({
@@ -101,9 +102,15 @@ export const appRouter = router({
       if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede consultar administradores institucionales." });
       return db.listInstitutionAdmins(input.institutionId);
     }),
-    create: protectedProcedure.input(z.object({ name: z.string().trim().min(3).max(180), slug: z.string().trim().min(3).max(80).regex(/^[a-z0-9-]+$/) })).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(z.object({ name: z.string().trim().min(3).max(180), slug: z.string().trim().min(3).max(80).regex(/^[a-z0-9-]+$/), logoBase64: z.string().max(8_000_000).nullable().optional(), logoFileName: z.string().max(160).nullable().optional(), logoMimeType: z.string().regex(/^image\/(png|jpeg|webp|svg\+xml)$/).nullable().optional(), primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#B69A5E"), secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#1B201D") })).mutation(async ({ ctx, input }) => {
       if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede crear instituciones." });
-      return { id: await db.createInstitution(input) };
+      let logoUrl: string | null = null;
+      if (input.logoBase64 && input.logoMimeType) {
+        const safeName = (input.logoFileName || "logo").replace(/[^a-zA-Z0-9._-]/g, "-").slice(-100);
+        const uploaded = await storagePut(`institutions/logos/${Date.now()}-${safeName}`, Buffer.from(input.logoBase64, "base64"), input.logoMimeType);
+        logoUrl = uploaded.url;
+      }
+      return { id: await db.createInstitution({ name: input.name, slug: input.slug, logoUrl, primaryColor: input.primaryColor, secondaryColor: input.secondaryColor }) };
     }),
     remove: protectedProcedure.input(z.object({ institutionId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       if (!isPlatformOwner(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el propietario de WijiEdu puede eliminar instituciones." });

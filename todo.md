@@ -303,3 +303,13 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Incluir portada, resumen, detalle de calificaciones, promedios y datos institucionales sin inventar información.
 - [x] Añadir pruebas del exportador Excel y de la navegación desde notificaciones.
 - [x] Validar escritorio/móvil y publicar la versión mejorada.
+
+## Branding institucional y Excel visual
+
+- [x] Añadir logo y configuración de identidad visual al crear o editar una institución.
+- [x] Detectar una paleta dominante segura desde el logo y aplicarla al portal de la institución.
+- [x] Mostrar logo, nombre y colores institucionales en navegación y dashboard.
+- [x] Rediseñar el inicio de sesión con una presentación más atractiva y adaptable.
+- [x] Mejorar colores, encabezados, estilos y jerarquía visual del Excel profesional.
+- [x] Añadir pruebas de branding, contraste, exportación y validación responsive.
+- [x] Guardar y publicar la versión mejorada.

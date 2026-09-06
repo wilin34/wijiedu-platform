@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   listInstitutionsForUser: vi.fn(async (userId: number) => userId === 7 ? [{ id: 1, name: "Institución A", slug: "institucion-a", role: "admin" }] : []),
   listInstitutions: vi.fn(async () => [{ id: 1, name: "Institución A", slug: "institucion-a", status: "active" }]),
   createInstitution: vi.fn(async () => 2),
+  updateInstitutionBranding: vi.fn(),
+  storagePut: vi.fn(async () => ({ key: "institutions/logos/logo.png", url: "/manus-storage/institutions/logos/logo.png" })),
   deleteInstitution: vi.fn(async (institutionId: number) => { if (institutionId === 1) throw new Error("La institución principal no se puede eliminar."); return { success: true }; }),
   addInstitutionMembership: vi.fn(),
   getUserByEmail: vi.fn(async () => undefined),
@@ -13,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./db", () => mocks);
+vi.mock("./storage", () => ({ storagePut: mocks.storagePut }));
 const { appRouter } = await import("./routers");
 
 function context(role: "admin" | "student" = "student", owner = false) {
@@ -45,6 +48,13 @@ describe("institutions", () => {
     await expect(admin.institutions.create({ name: "Institución B", slug: "institucion-b" })).resolves.toEqual({ id: 2 });
     await expect(admin.institutions.addMember({ institutionId: 2, userId: 9, role: "teacher" })).resolves.toEqual({ success: true });
     expect(mocks.addInstitutionMembership).toHaveBeenCalledWith({ institutionId: 2, userId: 9, role: "teacher" });
+  });
+
+  it("guarda logo y paleta al crear una institución", async () => {
+    const owner = appRouter.createCaller(context("admin", true));
+    await expect(owner.institutions.create({ name: "Institución Visual", slug: "institucion-visual", logoBase64: "aGVsbG8=", logoFileName: "marca.png", logoMimeType: "image/png", primaryColor: "#123456", secondaryColor: "#0A0B0C" })).resolves.toEqual({ id: 2 });
+    expect(mocks.storagePut).toHaveBeenCalledWith(expect.stringContaining("institutions/logos/"), expect.any(Buffer), "image/png");
+    expect(mocks.createInstitution).toHaveBeenCalledWith({ name: "Institución Visual", slug: "institucion-visual", logoUrl: "/manus-storage/institutions/logos/logo.png", primaryColor: "#123456", secondaryColor: "#0A0B0C" });
   });
 
   it("solo permite al propietario eliminar instituciones creadas y protege la principal", async () => {

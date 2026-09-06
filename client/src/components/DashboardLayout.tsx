@@ -2,7 +2,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { cn } from "@/lib/utils";
 import { GraduationCap, Landmark, LogOut, Menu, PanelLeftClose, PanelLeftOpen, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
+import { trpc } from "@/lib/trpc";
 import { Button } from "./ui/button";
 import NotificationCenter from "./NotificationCenter";
 import InstitutionSwitcher from "./InstitutionSwitcher";
@@ -32,6 +33,12 @@ export default function DashboardLayout({
   roleLabel,
 }: DashboardLayoutProps) {
   const { loading, user, logout, error } = useAuth();
+  const institutions = trpc.institutions.mine.useQuery(undefined, { enabled: Boolean(user) });
+  const activeInstitutionId = typeof document === "undefined" ? 0 : Number(document.cookie.match(/(?:^|; )wijiedu_institution=(\d+)/)?.[1] || 0);
+  const activeInstitution = institutions.data?.find(item => item.id === activeInstitutionId) || institutions.data?.[0];
+  const primaryColor = activeInstitution?.primaryColor || "#B69A5E";
+  const secondaryColor = activeInstitution?.secondaryColor || "#1B201D";
+  const brandStyle = { "--brand-primary": primaryColor, "--brand-secondary": secondaryColor } as CSSProperties;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -70,12 +77,12 @@ export default function DashboardLayout({
   const initials = (user.name || "U").slice(0, 1).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#171A17] text-[#F1F0EA]">
+    <div style={brandStyle} className="min-h-screen bg-[#171A17] text-[#F1F0EA]">
       {mobileOpen && <button className="fixed inset-0 z-30 bg-black/60 lg:hidden" aria-label="Cerrar menú" onClick={() => setMobileOpen(false)} />}
       <aside className={cn("fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[#42463F] bg-[#1C201D] transition-all duration-200", collapsed ? "w-[72px]" : "w-[268px]", mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0")}>
         <div className="flex min-h-[78px] items-center gap-3 border-b border-[#42463F] px-5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#D8BF86]/45 bg-[#B69A5E] text-[#171A17] shadow-[inset_0_1px_0_rgba(255,255,255,.28)]"><GraduationCap className="h-5 w-5" strokeWidth={1.8} /></div>
-          {!collapsed && <div className="min-w-0"><p className="font-display text-xl font-bold tracking-tight text-white">WijiEdu</p><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#C8AE72]">Gestión académica</p></div>}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/25 text-[#171A17] shadow-[inset_0_1px_0_rgba(255,255,255,.28)]" style={{ backgroundColor: primaryColor }}>{activeInstitution?.logoUrl ? <img src={activeInstitution.logoUrl} alt="Logo institucional" className="h-full w-full object-contain p-1.5" /> : <GraduationCap className="h-5 w-5" strokeWidth={1.8} />}</div>
+          {!collapsed && <div className="min-w-0"><p className="truncate font-display text-xl font-bold tracking-tight text-white">{activeInstitution?.name || "WijiEdu"}</p><p className="text-[10px] font-semibold uppercase tracking-[0.15em]" style={{ color: primaryColor }}>Gestión académica</p></div>}
         </div>
         <button className="flex items-center gap-3 border-b border-[#42463F] px-5 py-4 text-left transition hover:bg-[#242724]" onClick={() => onNavigate("dashboard")}>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#343A33] text-xs font-bold text-[#E4D0A0]">{initials}</span>
@@ -97,7 +104,7 @@ export default function DashboardLayout({
         <header className="sticky top-0 z-20 flex h-[72px] items-center gap-3 border-b border-[#42463F] bg-[#171A17]/95 px-4 backdrop-blur lg:px-8">
           <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-[#B8BBB2] hover:bg-[#343A33] hover:text-white lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Abrir menú"><Menu className="h-5 w-5" strokeWidth={1.8} /></button>
           <button className="hidden h-9 w-9 items-center justify-center rounded-xl text-[#B8BBB2] hover:bg-[#343A33] hover:text-white lg:inline-flex" onClick={() => setCollapsed(value => !value)} aria-label="Mostrar u ocultar menú">{collapsed ? <PanelLeftOpen className="h-5 w-5" strokeWidth={1.8} /> : <PanelLeftClose className="h-5 w-5" strokeWidth={1.8} />}</button>
-          <div className="flex-1"><p className="hidden text-[10px] font-bold uppercase tracking-[0.15em] text-[#C9AA68] sm:block">Espacio institucional</p><h2 className="font-display text-xl font-bold text-white">{pageTitle}</h2></div>
+          <div className="flex-1"><p className="hidden text-[10px] font-bold uppercase tracking-[0.15em] sm:block" style={{ color: primaryColor }}>Espacio institucional</p><h2 className="font-display text-xl font-bold text-white">{pageTitle}</h2></div>
           <InstitutionSwitcher />
           <NotificationCenter />
           <span className="hidden items-center gap-2 text-xs text-[#B8BBB2] sm:flex"><Landmark className="h-3.5 w-3.5 text-[#D8BF86]" strokeWidth={1.8} />{user.email || "Sesión institucional"}</span>

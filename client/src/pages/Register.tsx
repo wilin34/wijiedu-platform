@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Landmark } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CheckCircle2, Landmark, ShieldCheck, Sparkles } from "lucide-react";
 import React, { FormEvent, useState } from "react";
 import { toast } from "sonner";
 
@@ -11,49 +11,19 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitted, setSubmitted] = useState(false);
-
-  const login = trpc.localAuth.login.useMutation({
-    onSuccess: () => { toast.success("Acceso correcto."); window.location.href = "/"; },
-    onError: error => toast.error(error.data?.code === "UNAUTHORIZED" ? "Datos incorrectos." : error.message),
-  });
-  const requestRecovery = trpc.localAuth.requestPasswordReset.useMutation({
-    onSuccess: data => { setSubmitted(true); toast.success(data.message); },
-    onError: error => toast.error(error.message),
-  });
+  const login = trpc.localAuth.login.useMutation({ onSuccess: () => { toast.success("Acceso correcto."); window.location.href = "/"; }, onError: error => toast.error(error.data?.code === "UNAUTHORIZED" ? "Datos incorrectos." : error.message) });
+  const requestRecovery = trpc.localAuth.requestPasswordReset.useMutation({ onSuccess: data => { setSubmitted(true); toast.success(data.message); }, onError: error => toast.error(error.message) });
   const pending = login.isPending || requestRecovery.isPending;
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (mode === "recovery") { requestRecovery.mutate({ email }); return; }
-    login.mutate({ email, password });
-  }
-
   const isRecovery = mode === "recovery";
-  const title = isRecovery ? "Solicitar recuperación" : "Acceso institucional";
-  const description = isRecovery ? "El administrador de tu institución revisará la solicitud y te dará respuesta en menos de 24 horas." : "Ingresa con las credenciales asignadas por la administración académica.";
+  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (isRecovery) { requestRecovery.mutate({ email }); return; } login.mutate({ email, password }); }
 
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-[#07182B] px-5 py-8 text-[#ECF2F7]">
-      <section className="w-full max-w-md rounded-xl border border-[#284761] bg-[#0C2138] p-7 shadow-[0_18px_48px_rgba(0,0,0,.22)] sm:p-8">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-md bg-[#B99757] text-[#07182B]"><Landmark className="h-7 w-7" /></div>
-          <p className="institutional-kicker">{title}</p>
-          <h1 className="mt-1 font-display text-3xl font-bold text-white">WijiEdu</h1>
-          <p className="mt-1 text-sm text-[#9AAFC1]">Sistema de gestión académica</p>
-        </div>
-        <p className="mb-6 border-y border-[#284761] py-4 text-center text-sm leading-6 text-[#C7D4DE]">{description}</p>
-        {isRecovery && submitted && <div className="mb-5 rounded-lg border border-[#B99757]/40 bg-[#B99757]/10 p-4 text-sm leading-6 text-[#E8D9B1]">Tu solicitud fue enviada al administrador de tu institución. En menos de 24 horas recibirás respuesta por el canal institucional habilitado.</div>}
-        <form className="space-y-4" onSubmit={submit}>
-          <label className="block"><span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.05em] text-[#8898AA]">Correo electrónico</span><input required type="email" autoComplete="email" className="wij-input" value={email} onChange={event => setEmail(event.target.value)} placeholder="nombre@correo.com" /></label>
-          {!isRecovery && <label className="block"><span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.05em] text-[#8898AA]">Contraseña</span><input required type="password" minLength={1} autoComplete="current-password" className="wij-input" value={password} onChange={event => setPassword(event.target.value)} placeholder="Tu contraseña" /></label>}
-          <Button type="submit" disabled={pending} className="mt-2 w-full bg-[#B99757] py-5 font-semibold text-[#07182B] hover:bg-[#C9AA68]">{pending ? "Procesando…" : isRecovery ? "Enviar solicitud" : "Ingresar al portal"}</Button>
-        </form>
-        <div className="mt-5 flex flex-col items-center gap-2 text-center text-xs leading-5 text-[#9AAFC1]">
-          {!isRecovery && <button type="button" className="font-semibold text-[#D3B56D] underline-offset-4 hover:underline" onClick={() => { setMode("recovery"); setSubmitted(false); }}>¿Necesitas cambiar tu contraseña?</button>}
-          {isRecovery && <button type="button" className="inline-flex items-center gap-1 font-semibold text-[#D3B56D] underline-offset-4 hover:underline" onClick={() => { setMode("login"); setSubmitted(false); }}><ArrowLeft className="h-3.5 w-3.5" /> Volver al acceso</button>}
-          {!isRecovery && <span>Para asistencia con tu cuenta, comunícate con la administración de la institución.</span>}
-        </div>
-      </section>
-    </main>
-  );
+  return <main className="relative flex min-h-screen overflow-hidden bg-[#101512] text-[#F5F1E8]">
+    <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 rounded-full bg-[#B69A5E]/15 blur-3xl" />
+    <div className="pointer-events-none absolute -bottom-44 right-0 h-[32rem] w-[32rem] rounded-full bg-[#315D53]/20 blur-3xl" />
+    <section className="relative hidden w-[46%] flex-col justify-between overflow-hidden border-r border-white/10 bg-[#18241F] p-10 lg:flex xl:p-14">
+      <div><div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#B69A5E] text-[#142019] shadow-[0_10px_30px_rgba(182,154,94,.24)]"><Landmark className="h-6 w-6" /></span><div><p className="font-display text-2xl font-bold tracking-tight">WijiEdu</p><p className="text-[10px] font-bold uppercase tracking-[.22em] text-[#D8BF86]">Gestión académica</p></div></div><div className="mt-24 max-w-lg"><p className="mb-4 text-xs font-bold uppercase tracking-[.25em] text-[#D8BF86]">Espacios que hacen avanzar</p><h1 className="font-display text-5xl font-extrabold leading-[1.02] text-white xl:text-6xl">Una institución.<br /><span className="text-[#D8BF86]">Una visión común.</span></h1><p className="mt-7 max-w-md text-base leading-7 text-[#B7C4BB]">Organiza clases, personas y evidencias académicas con una experiencia diseñada para acompañar cada logro.</p></div></div>
+      <div className="grid gap-3 text-sm text-[#DCE4DD]"><div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.04] p-4"><CheckCircle2 className="h-5 w-5 text-[#D8BF86]" /><span>Información académica en un solo lugar</span></div><div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.04] p-4"><ShieldCheck className="h-5 w-5 text-[#D8BF86]" /><span>Accesos institucionales protegidos</span></div></div>
+    </section>
+    <section className="relative flex flex-1 items-center justify-center px-5 py-10 sm:px-10"><div className="w-full max-w-md"><div className="mb-8 flex items-center gap-3 lg:hidden"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#B69A5E] text-[#142019]"><Landmark className="h-5 w-5" /></span><div><p className="font-display text-xl font-bold">WijiEdu</p><p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#D8BF86]">Gestión académica</p></div></div><div className="mb-8"><div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#B69A5E]/30 bg-[#B69A5E]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.16em] text-[#E4D0A0]"><Sparkles className="h-3.5 w-3.5" />{isRecovery ? "Soporte institucional" : "Acceso seguro"}</div><h2 className="font-display text-4xl font-extrabold tracking-tight text-white">{isRecovery ? "Solicita asistencia" : "Bienvenido de nuevo"}</h2><p className="mt-3 text-sm leading-6 text-[#AAB8AE]">{isRecovery ? "El administrador de tu institución revisará la solicitud y responderá en menos de 24 horas." : "Ingresa con las credenciales asignadas por la administración académica."}</p></div>{isRecovery && submitted && <div className="mb-5 rounded-2xl border border-[#B69A5E]/35 bg-[#B69A5E]/10 p-4 text-sm leading-6 text-[#F0E5C6]"><p className="font-semibold">Solicitud recibida</p><p className="mt-1">El administrador de tu institución recibió el aviso y revisará tu caso.</p></div>}<form className="space-y-4" onSubmit={submit}><label className="block"><span className="mb-2 block text-[11px] font-bold uppercase tracking-[.12em] text-[#B7C4BB]">Correo electrónico</span><input required type="email" autoComplete="email" className="wij-input h-12 border-white/15 bg-white/[.05]" value={email} onChange={event => setEmail(event.target.value)} placeholder="nombre@institucion.edu" /></label>{!isRecovery && <label className="block"><span className="mb-2 block text-[11px] font-bold uppercase tracking-[.12em] text-[#B7C4BB]">Contraseña</span><input required type="password" autoComplete="current-password" className="wij-input h-12 border-white/15 bg-white/[.05]" value={password} onChange={event => setPassword(event.target.value)} placeholder="Tu contraseña" /></label>}<Button type="submit" disabled={pending} className="mt-3 h-12 w-full rounded-xl bg-[#C6A867] font-bold text-[#152019] shadow-[0_12px_25px_rgba(198,168,103,.16)] hover:bg-[#D8BF86]">{pending ? "Procesando…" : isRecovery ? "Enviar solicitud" : "Ingresar al portal"}<ArrowUpRight className="ml-1 h-4 w-4" /></Button></form><div className="mt-6 flex flex-col items-center gap-3 text-center text-xs leading-5 text-[#92A398]">{!isRecovery && <button type="button" className="font-semibold text-[#D8BF86] hover:text-white" onClick={() => { setMode("recovery"); setSubmitted(false); }}>¿Necesitas cambiar tu contraseña?</button>}{isRecovery && <button type="button" className="inline-flex items-center gap-1 font-semibold text-[#D8BF86] hover:text-white" onClick={() => { setMode("login"); setSubmitted(false); }}><ArrowLeft className="h-3.5 w-3.5" />Volver al acceso</button>}<span>Si no tienes credenciales, comunícate con la administración de tu institución.</span></div></div></section>
+  </main>;
 }
