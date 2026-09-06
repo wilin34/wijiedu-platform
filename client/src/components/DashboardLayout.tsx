@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { cn } from "@/lib/utils";
 import { GraduationCap, Landmark, LogOut, Menu, PanelLeftClose, PanelLeftOpen, type LucideIcon } from "lucide-react";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "./ui/button";
 import NotificationCenter from "./NotificationCenter";
@@ -41,6 +41,18 @@ export default function DashboardLayout({
   const brandStyle = { "--brand-primary": primaryColor, "--brand-secondary": secondaryColor } as CSSProperties;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const firstNavigationRender = useRef(true);
+
+  useEffect(() => {
+    if (firstNavigationRender.current) {
+      firstNavigationRender.current = false;
+      return;
+    }
+    setIsNavigating(true);
+    const timer = window.setTimeout(() => setIsNavigating(false), 360);
+    return () => window.clearTimeout(timer);
+  }, [activeItem]);
 
   if (loading) {
     return (
@@ -78,6 +90,7 @@ export default function DashboardLayout({
 
   return (
     <div style={brandStyle} className="min-h-screen bg-[#171A17] text-[#F1F0EA]">
+      {isNavigating && <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-[#171A17]/72 backdrop-blur-[2px]" role="status" aria-live="polite" aria-label={`Cargando ${pageTitle}`}><div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-[#242724]/95 px-8 py-7 shadow-2xl"><div className="institution-loading-logo flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-white/20 shadow-lg" style={{ backgroundColor: primaryColor }}>{activeInstitution?.logoUrl ? <img src={activeInstitution.logoUrl} alt="" className="h-full w-full object-contain p-2" /> : <GraduationCap className="h-8 w-8 text-[#171A17]" strokeWidth={1.6} />}</div><div className="text-center"><p className="font-display text-lg font-bold text-white">{activeInstitution?.name || "WijiEdu"}</p><p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: primaryColor }}>Cargando sección</p></div></div></div>}
       {mobileOpen && <button className="fixed inset-0 z-30 bg-black/60 lg:hidden" aria-label="Cerrar menú" onClick={() => setMobileOpen(false)} />}
       <aside className={cn("fixed inset-y-0 left-0 z-40 flex flex-col border-r border-[#42463F] bg-[#1C201D] transition-all duration-200", collapsed ? "w-[72px]" : "w-[268px]", mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0")}>
         <div className="flex min-h-[78px] items-center gap-3 border-b border-[#42463F] px-5">

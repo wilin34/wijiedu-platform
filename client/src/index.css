@@ -66,3 +66,15 @@
   [class*="text-[#F87171]"] { color: #D5A09A !important; }
   [class*="bg-[#EF4444]/10"], [class*="bg-[#EF4444]/15"] { background-color: #432C2A !important; }
 }
+
+
+@keyframes institution-logo-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-primary, #B69A5E) 38%, transparent); }
+  50% { transform: scale(1.06); box-shadow: 0 0 0 10px color-mix(in srgb, var(--brand-primary, #B69A5E) 0%, transparent); }
+}
+
+.institution-loading-logo { animation: institution-logo-pulse 1.15s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .institution-loading-logo { animation: none; }
+}
