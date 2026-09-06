@@ -322,3 +322,8 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Añadir pruebas positivas y negativas de autorización por rol y materia asignada.
 - [x] Hacer más visible el logo, nombre y colores de la institución activa en navegación, encabezado y superficies principales.
 - [x] Validar responsive, aislamiento institucional y publicar la corrección.
+
+## Corrección de estabilidad detectada en validación
+
+- [x] Hacer idempotente la creación de preferencias de notificación ante solicitudes concurrentes.
+- [x] Repetir la suite completa y confirmar que permisos y branding siguen pasando.

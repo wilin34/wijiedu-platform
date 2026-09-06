@@ -1099,7 +1099,7 @@ export async function getNotificationPreferences(userId: number, institutionId =
   const db = await requireDb();
   const [existing] = await db.select().from(notificationPreferences).where(and(eq(notificationPreferences.userId, userId), eq(notificationPreferences.institutionId, institutionId))).limit(1);
   if (existing) return existing;
-  await db.insert(notificationPreferences).values({ userId, institutionId });
+  await db.insert(notificationPreferences).values({ userId, institutionId }).onDuplicateKeyUpdate({ set: { updatedAt: new Date() } });
   const [created] = await db.select().from(notificationPreferences).where(and(eq(notificationPreferences.userId, userId), eq(notificationPreferences.institutionId, institutionId))).limit(1);
   return created;
 }
