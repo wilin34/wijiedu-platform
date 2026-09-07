@@ -7,6 +7,12 @@ import {
   admissionDocuments,
   classSchedules,
   certificates,
+  financialAccounts,
+  financialCharges,
+  financialExpenses,
+  financialPayments,
+  lmsContents,
+  lmsContentProgress,
   competencies,
   courseLessons,
   courseModules,
@@ -1334,4 +1340,73 @@ export async function verifyCertificate(token: string) {
   const db = await requireDb();
   const [certificate] = await db.select().from(certificates).where(and(eq(certificates.verificationToken, token), isNull(certificates.revokedAt))).limit(1);
   return certificate;
+}
+
+export async function listFinancialCharges(institutionId: number) {
+  const db = await requireDb();
+  return db.select({ charge: financialCharges, studentName: students.fullName }).from(financialCharges).innerJoin(students, and(eq(students.id, financialCharges.studentId), eq(students.institutionId, institutionId))).where(eq(financialCharges.institutionId, institutionId)).orderBy(desc(financialCharges.createdAt));
+}
+
+export async function createFinancialCharge(input: { institutionId: number; studentId: number; concept: string; amountCents: number; dueAt: Date; createdBy: number }) {
+  const db = await requireDb();
+  const [student] = await db.select().from(students).where(and(eq(students.id, input.studentId), eq(students.institutionId, input.institutionId))).limit(1);
+  if (!student) return undefined;
+  const result = await db.insert(financialCharges).values({ ...input, status: "pending" });
+  const [created] = await db.select().from(financialCharges).where(eq(financialCharges.id, Number(result[0].insertId))).limit(1);
+  await db.insert(financialAccounts).values({ institutionId: input.institutionId, studentId: input.studentId, balanceCents: input.amountCents, status: "current", dueAt: input.dueAt }).onDuplicateKeyUpdate({ set: { balanceCents: sql`${financialAccounts.balanceCents} + ${input.amountCents}`, dueAt: input.dueAt } });
+  return created;
+}
+
+export async function listFinancialPayments(institutionId: number) {
+  const db = await requireDb();
+  return db.select({ payment: financialPayments, studentName: students.fullName }).from(financialPayments).innerJoin(students, and(eq(students.id, financialPayments.studentId), eq(students.institutionId, institutionId))).where(eq(financialPayments.institutionId, institutionId)).orderBy(desc(financialPayments.paidAt));
+}
+
+export async function createFinancialPayment(input: { institutionId: number; studentId: number; chargeId?: number | null; amountCents: number; paymentMethod: string; reference?: string | null; receivedBy: number }) {
+  const db = await requireDb();
+  const [student] = await db.select().from(students).where(and(eq(students.id, input.studentId), eq(students.institutionId, input.institutionId))).limit(1);
+  if (!student) return undefined;
+  const result = await db.insert(financialPayments).values(input);
+  await db.update(financialAccounts).set({ balanceCents: sql`GREATEST(0, ${financialAccounts.balanceCents} - ${input.amountCents})`, status: "current" }).where(and(eq(financialAccounts.institutionId, input.institutionId), eq(financialAccounts.studentId, input.studentId)));
+  if (input.chargeId) await db.update(financialCharges).set({ status: "paid" }).where(and(eq(financialCharges.id, input.chargeId), eq(financialCharges.institutionId, input.institutionId)));
+  const [created] = await db.select().from(financialPayments).where(eq(financialPayments.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function createFinancialExpense(input: { institutionId: number; concept: string; amountCents: number; category: string; incurredAt: Date; createdBy: number }) {
+  const db = await requireDb();
+  const result = await db.insert(financialExpenses).values(input);
+  const [created] = await db.select().from(financialExpenses).where(eq(financialExpenses.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function listFinancialExpenses(institutionId: number) {
+  const db = await requireDb();
+  return db.select().from(financialExpenses).where(eq(financialExpenses.institutionId, institutionId)).orderBy(desc(financialExpenses.incurredAt));
+}
+
+export async function listLmsContents(institutionId: number, subjectId?: number, studentId?: number) {
+  const db = await requireDb();
+  const rows = await db.select({ content: lmsContents, subjectName: subjects.name }).from(lmsContents).innerJoin(subjects, and(eq(subjects.id, lmsContents.subjectId), eq(subjects.institutionId, institutionId))).where(and(eq(lmsContents.institutionId, institutionId), ...(subjectId ? [eq(lmsContents.subjectId, subjectId)] : []), ...(studentId ? [eq(lmsContents.published, 1)] : []))).orderBy(asc(lmsContents.sortOrder), asc(lmsContents.createdAt));
+  if (!studentId) return rows;
+  const progress = await db.select().from(lmsContentProgress).where(and(eq(lmsContentProgress.institutionId, institutionId), eq(lmsContentProgress.studentId, studentId)));
+  const completed = new Map(progress.map(item => [item.contentId, item.completedAt]));
+  return rows.map(row => ({ ...row, completedAt: completed.get(row.content.id) ?? null }));
+}
+
+export async function createLmsContent(input: { institutionId: number; subjectId: number; moduleId?: number | null; title: string; contentType: "reading" | "video" | "link" | "file" | "task"; body?: string | null; url?: string | null; fileKey?: string | null; createdBy: number }) {
+  const db = await requireDb();
+  const [subject] = await db.select().from(subjects).where(and(eq(subjects.id, input.subjectId), eq(subjects.institutionId, input.institutionId))).limit(1);
+  if (!subject) return undefined;
+  const result = await db.insert(lmsContents).values({ ...input, published: 1, sortOrder: 0 });
+  const [created] = await db.select().from(lmsContents).where(eq(lmsContents.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function markLmsContentComplete(input: { institutionId: number; contentId: number; studentId: number; completed: boolean }) {
+  const db = await requireDb();
+  const [content] = await db.select().from(lmsContents).where(and(eq(lmsContents.id, input.contentId), eq(lmsContents.institutionId, input.institutionId), eq(lmsContents.published, 1))).limit(1);
+  if (!content) return undefined;
+  await db.insert(lmsContentProgress).values({ institutionId: input.institutionId, contentId: input.contentId, studentId: input.studentId, completedAt: input.completed ? new Date() : null }).onDuplicateKeyUpdate({ set: { completedAt: input.completed ? new Date() : null, lastViewedAt: new Date() } });
+  return { contentId: input.contentId, completed: input.completed };
 }

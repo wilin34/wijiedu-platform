@@ -346,14 +346,14 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Generar certificados verificables con código QR y consulta pública segura.
 
 ### Gestión financiera
-- [ ] Registrar conceptos de cobro, cartera, ingresos y egresos por institución.
+- [x] Registrar conceptos de cobro, cartera, ingresos y egresos por institución.
 - [ ] Calcular estados de cuenta y mora sin mezclar instituciones.
 - [ ] Aplicar bloqueos automáticos de funciones académicas por mora según configuración institucional.
 
 ### LMS
-- [ ] Organizar lecturas, videos, tareas y recursos por materia y módulo.
+- [x] Organizar lecturas, videos, tareas y recursos por materia y módulo.
 - [ ] Sincronizar entregas y resultados del LMS con las notas del docente.
-- [ ] Mantener permisos diferenciados para docentes, estudiantes y administración.
+- [x] Mantener permisos diferenciados para docentes, estudiantes y administración.
 
 ### Bienestar y egresados
 - [ ] Crear encuestas de satisfacción con respuestas aisladas por institución.
