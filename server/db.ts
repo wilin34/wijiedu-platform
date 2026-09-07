@@ -5,6 +5,8 @@ import {
   academicPeriods,
   admissionApplications,
   admissionDocuments,
+  classSchedules,
+  certificates,
   competencies,
   courseLessons,
   courseModules,
@@ -27,6 +29,8 @@ import {
   recoveryRequests,
   students,
   subjects,
+  studyPlans,
+  studyPlanSubjects,
   submissions,
   users,
 } from "../drizzle/schema";
@@ -1282,4 +1286,52 @@ export async function listPreEnrollmentRequests(institutionId: number) {
 export async function listMyAdmissionApplications(institutionId: number, applicantUserId: number) {
   const db = await requireDb();
   return db.select().from(admissionApplications).where(and(eq(admissionApplications.institutionId, institutionId), eq(admissionApplications.applicantUserId, applicantUserId))).orderBy(desc(admissionApplications.createdAt));
+}
+
+export async function bulkCreateProspects(institutionId: number, rows: Array<{ fullName: string; email: string; phone?: string | null; interestedProgram?: string | null; source?: string | null; notes?: string | null }>) {
+  const db = await requireDb();
+  if (!rows.length) return [];
+  await db.insert(prospects).values(rows.map(row => ({ ...row, institutionId, email: row.email.toLowerCase(), status: "new" as const })));
+  return db.select().from(prospects).where(eq(prospects.institutionId, institutionId)).orderBy(desc(prospects.createdAt));
+}
+
+export async function listClassSchedules(institutionId: number) {
+  const db = await requireDb();
+  return db.select({ schedule: classSchedules, subjectName: subjects.name, subjectCode: subjects.code }).from(classSchedules).innerJoin(subjects, and(eq(subjects.id, classSchedules.subjectId), eq(subjects.institutionId, institutionId))).where(eq(classSchedules.institutionId, institutionId)).orderBy(asc(classSchedules.weekday), asc(classSchedules.startsAt));
+}
+
+export async function createClassSchedule(input: { institutionId: number; subjectId: number; periodId: number; teacherId?: number | null; weekday: number; startsAt: string; endsAt: string; classroom?: string | null; modality: "onsite" | "virtual" | "hybrid" }) {
+  const db = await requireDb();
+  const [subject] = await db.select().from(subjects).where(and(eq(subjects.id, input.subjectId), eq(subjects.institutionId, input.institutionId))).limit(1);
+  if (!subject) return undefined;
+  const result = await db.insert(classSchedules).values(input);
+  const [created] = await db.select().from(classSchedules).where(eq(classSchedules.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function listStudyPlans(institutionId: number) {
+  const db = await requireDb();
+  return db.select().from(studyPlans).where(eq(studyPlans.institutionId, institutionId)).orderBy(desc(studyPlans.updatedAt));
+}
+
+export async function createStudyPlan(input: { institutionId: number; name: string; version: string; description?: string | null; createdBy: number }) {
+  const db = await requireDb();
+  const result = await db.insert(studyPlans).values(input);
+  const [created] = await db.select().from(studyPlans).where(eq(studyPlans.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function issueCertificate(input: { institutionId: number; studentId: number; certificateType: string; certificateNumber: string; verificationToken: string; issuedBy: number }) {
+  const db = await requireDb();
+  const [student] = await db.select().from(students).where(and(eq(students.id, input.studentId), eq(students.institutionId, input.institutionId))).limit(1);
+  if (!student) return undefined;
+  const result = await db.insert(certificates).values(input);
+  const [created] = await db.select().from(certificates).where(eq(certificates.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function verifyCertificate(token: string) {
+  const db = await requireDb();
+  const [certificate] = await db.select().from(certificates).where(and(eq(certificates.verificationToken, token), isNull(certificates.revokedAt))).limit(1);
+  return certificate;
 }

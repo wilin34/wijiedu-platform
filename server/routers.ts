@@ -155,6 +155,7 @@ export const appRouter = router({
       assertInstitutionAdmin(ctx.user);
       return db.createProspect({ ...input, institutionId: ctx.institutionId ?? 1 });
     }),
+    bulkCreateProspects: protectedProcedure.input(z.object({ rows: z.array(z.object({ fullName: z.string().trim().min(2).max(180), email: z.string().trim().email().max(320), phone: z.string().trim().max(32).nullable().optional(), interestedProgram: z.string().trim().max(180).nullable().optional(), source: z.string().trim().max(100).nullable().optional(), notes: z.string().trim().max(5000).nullable().optional() })).min(1).max(500) })).mutation(async ({ ctx, input }) => { assertInstitutionAdmin(ctx.user); return db.bulkCreateProspects(ctx.institutionId ?? 1, input.rows); }),
     updateProspect: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: z.object({ fullName: z.string().trim().min(2).max(180).optional(), email: z.string().trim().email().max(320).optional(), phone: z.string().trim().max(32).nullable().optional(), documentId: z.string().trim().max(64).nullable().optional(), interestedProgram: z.string().trim().max(180).nullable().optional(), source: z.string().trim().max(100).nullable().optional(), status: z.enum(["new", "contacted", "interested", "admitted", "enrolled", "lost"]).optional(), ownerUserId: z.number().int().positive().nullable().optional(), notes: z.string().trim().max(5000).nullable().optional() }) })).mutation(async ({ ctx, input }) => {
       assertInstitutionAdmin(ctx.user);
       const result = await db.updateProspect(input.id, ctx.institutionId ?? 1, input.data, ctx.user.id);
@@ -174,6 +175,14 @@ export const appRouter = router({
       return result;
     }),
   }),
+  academicManagement: router({
+    schedules: protectedProcedure.query(async ({ ctx }) => { assertInstitutionAdmin(ctx.user); return db.listClassSchedules(ctx.institutionId ?? 1); }),
+    createSchedule: protectedProcedure.input(z.object({ subjectId: z.number().int().positive(), periodId: z.number().int().positive(), teacherId: z.number().int().positive().nullable().optional(), weekday: z.number().int().min(1).max(7), startsAt: z.string().regex(/^\\d{2}:\\d{2}$/), endsAt: z.string().regex(/^\\d{2}:\\d{2}$/), classroom: z.string().trim().max(120).nullable().optional(), modality: z.enum(["onsite", "virtual", "hybrid"]) })).mutation(async ({ ctx, input }) => { assertInstitutionAdmin(ctx.user); const result = await db.createClassSchedule({ ...input, institutionId: ctx.institutionId ?? 1 }); if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "La materia no pertenece a la institución activa." }); return result; }),
+    studyPlans: protectedProcedure.query(async ({ ctx }) => { assertInstitutionAdmin(ctx.user); return db.listStudyPlans(ctx.institutionId ?? 1); }),
+    createStudyPlan: protectedProcedure.input(z.object({ name: z.string().trim().min(2).max(180), version: z.string().trim().min(1).max(40), description: z.string().trim().max(5000).nullable().optional() })).mutation(async ({ ctx, input }) => { assertInstitutionAdmin(ctx.user); return db.createStudyPlan({ ...input, institutionId: ctx.institutionId ?? 1, createdBy: ctx.user.id }); }),
+    issueCertificate: protectedProcedure.input(z.object({ studentId: z.number().int().positive(), certificateType: z.string().trim().min(2).max(120), certificateNumber: z.string().trim().min(2).max(100) })).mutation(async ({ ctx, input }) => { assertInstitutionAdmin(ctx.user); const result = await db.issueCertificate({ ...input, institutionId: ctx.institutionId ?? 1, issuedBy: ctx.user.id, verificationToken: crypto.randomUUID().replaceAll("-", "") }); if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "El estudiante no pertenece a la institución activa." }); return result; }),
+  }),
+  certificateVerification: router({ verify: publicProcedure.input(z.object({ token: z.string().trim().min(16).max(128) })).query(({ input }) => db.verifyCertificate(input.token)) }),
   admissions: router({
     listApplications: protectedProcedure.query(async ({ ctx }) => {
       assertInstitutionAdmin(ctx.user);

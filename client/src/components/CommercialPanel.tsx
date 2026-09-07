@@ -17,6 +17,7 @@ export default function CommercialPanel() {
   const [status, setStatus] = useState<keyof typeof statusLabels | "all">("all");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ fullName: "", email: "", phone: "", interestedProgram: "", source: "", notes: "" });
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
   const utils = trpc.useUtils();
   const prospects = trpc.commercial.listProspects.useQuery(status === "all" ? undefined : { status });
   const createProspect = trpc.commercial.createProspect.useMutation({
@@ -26,6 +27,10 @@ export default function CommercialPanel() {
       setShowForm(false);
       await utils.commercial.listProspects.invalidate();
     },
+    onError: error => toast.error(error.message),
+  });
+  const bulkCreate = trpc.commercial.bulkCreateProspects.useMutation({
+    onSuccess: async result => { toast.success(`${result.length} prospectos importados.`); setBulkFile(null); await utils.commercial.listProspects.invalidate(); },
     onError: error => toast.error(error.message),
   });
   const convert = trpc.commercial.convertToStudent.useMutation({
@@ -45,6 +50,17 @@ export default function CommercialPanel() {
 
   const statuses: Array<keyof typeof statusLabels | "all"> = ["all", "new", "contacted", "interested", "admitted", "enrolled", "lost"];
 
+  const importCsv = async () => {
+    if (!bulkFile) return;
+    const text = await bulkFile.text();
+    const lines = text.split(/\\r?\\n/).map(line => line.trim()).filter(Boolean);
+    const [header, ...rows] = lines;
+    if (!header || !header.toLowerCase().includes("nombre") || !header.toLowerCase().includes("correo")) { toast.error("El CSV debe incluir las columnas nombre y correo."); return; }
+    const parsed = rows.map(line => line.split(",").map(value => value.trim())).map(values => ({ fullName: values[0] || "", email: values[1] || "", phone: values[2] || null, interestedProgram: values[3] || null, source: values[4] || null, notes: values[5] || null })).filter(row => row.fullName && row.email);
+    if (!parsed.length) { toast.error("No se encontraron filas válidas."); return; }
+    bulkCreate.mutate({ rows: parsed });
+  };
+
   return <div className="space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -52,6 +68,8 @@ export default function CommercialPanel() {
       </div>
       <Button className="bg-[#B69A5E] text-[#171A17] hover:bg-[#D8BF86]" onClick={() => setShowForm(value => !value)}><Plus className="h-4 w-4" />Nuevo prospecto</Button>
     </div>
+
+    <section className="wij-card p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-display font-bold text-white">Carga masiva</h3><p className="text-xs text-[#9AA8B9]">CSV: nombre, correo, teléfono, programa, origen, notas. Máximo 500 filas.</p></div><div className="flex items-center gap-2"><input type="file" accept=".csv,text/csv" className="wij-input max-w-xs" onChange={event => setBulkFile(event.target.files?.[0] || null)} /><Button variant="outline" className="border-[#3A4556] bg-transparent text-[#DDE5EE]" disabled={!bulkFile || bulkCreate.isPending} onClick={importCsv}>Importar</Button></div></div></section>
 
     {showForm && <section className="wij-card p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-display text-lg font-bold text-white">Registrar prospecto</h3><p className="text-sm text-[#9AA8B9]">Los datos se guardan únicamente en la institución activa.</p></div><UserPlus className="h-5 w-5 text-[#D8BF86]" /></div><div className="grid gap-4 md:grid-cols-2"><input className="wij-input" placeholder="Nombre completo" value={form.fullName} onChange={event => setForm({ ...form, fullName: event.target.value })} /><input className="wij-input" type="email" placeholder="Correo electrónico" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} /><input className="wij-input" placeholder="Teléfono" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} /><input className="wij-input" placeholder="Programa de interés" value={form.interestedProgram} onChange={event => setForm({ ...form, interestedProgram: event.target.value })} /><input className="wij-input" placeholder="Origen: feria, web, referido…" value={form.source} onChange={event => setForm({ ...form, source: event.target.value })} /><textarea className="wij-input min-h-20 py-3 md:col-span-2" placeholder="Notas comerciales" value={form.notes} onChange={event => setForm({ ...form, notes: event.target.value })} /></div><div className="mt-4 flex justify-end gap-2"><Button variant="outline" className="border-[#3A4556] bg-transparent text-[#DDE5EE]" onClick={() => setShowForm(false)}>Cancelar</Button><Button className="bg-[#B69A5E] text-[#171A17] hover:bg-[#D8BF86]" disabled={createProspect.isPending || form.fullName.trim().length < 2 || !form.email} onClick={() => createProspect.mutate({ ...form, phone: form.phone || null, interestedProgram: form.interestedProgram || null, source: form.source || null, notes: form.notes || null })}>Guardar prospecto</Button></div></section>}
 

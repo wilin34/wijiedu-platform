@@ -332,7 +332,7 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 
 ### Gestión comercial
 - [x] Crear prospectos con datos de contacto, programa de interés, origen, estado y responsable.
-- [ ] Permitir carga masiva de prospectos mediante Excel/CSV con validación por institución.
+- [x] Permitir carga masiva de prospectos mediante Excel/CSV con validación por institución.
 - [x] Registrar actividades comerciales y convertir un prospecto en interesado, admitido o matriculado.
 
 ### Admisiones y matrículas
@@ -341,9 +341,9 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Permitir autogestión de prematrícula para prospectos y estudiantes autorizados.
 
 ### Gestión académica ampliada
-- [ ] Añadir horarios por materia, grupo, docente, aula y período.
+- [x] Añadir horarios por materia, grupo, docente, aula y período.
 - [ ] Añadir planes de estudio y relación con materias y competencias.
-- [ ] Generar certificados verificables con código QR y consulta pública segura.
+- [x] Generar certificados verificables con código QR y consulta pública segura.
 
 ### Gestión financiera
 - [ ] Registrar conceptos de cobro, cartera, ingresos y egresos por institución.
