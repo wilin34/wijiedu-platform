@@ -1278,3 +1278,8 @@ export async function listPreEnrollmentRequests(institutionId: number) {
   const db = await requireDb();
   return db.select().from(preEnrollmentRequests).where(eq(preEnrollmentRequests.institutionId, institutionId)).orderBy(desc(preEnrollmentRequests.requestedAt));
 }
+
+export async function listMyAdmissionApplications(institutionId: number, applicantUserId: number) {
+  const db = await requireDb();
+  return db.select().from(admissionApplications).where(and(eq(admissionApplications.institutionId, institutionId), eq(admissionApplications.applicantUserId, applicantUserId))).orderBy(desc(admissionApplications.createdAt));
+}

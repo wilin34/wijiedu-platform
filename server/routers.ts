@@ -179,6 +179,7 @@ export const appRouter = router({
       assertInstitutionAdmin(ctx.user);
       return db.listAdmissionApplications(ctx.institutionId ?? 1);
     }),
+    myApplications: protectedProcedure.query(({ ctx }) => db.listMyAdmissionApplications(ctx.institutionId ?? 1, ctx.user.id)),
     createApplication: protectedProcedure.input(z.object({ prospectId: z.number().int().positive().nullable().optional(), programName: z.string().trim().min(2).max(180) })).mutation(async ({ ctx, input }) => {
       const institutionId = ctx.institutionId ?? 1;
       const result = await db.createAdmissionApplication({ ...input, institutionId, applicantUserId: ctx.user.id });

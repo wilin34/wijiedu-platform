@@ -336,9 +336,9 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Registrar actividades comerciales y convertir un prospecto en interesado, admitido o matriculado.
 
 ### Admisiones y matrículas
-- [ ] Crear flujo de admisión y prematrícula con estados y revisión administrativa.
-- [ ] Permitir cargar documentos digitales usando almacenamiento seguro y metadatos en base de datos.
-- [ ] Permitir autogestión de prematrícula para prospectos y estudiantes autorizados.
+- [x] Crear flujo de admisión y prematrícula con estados y revisión administrativa.
+- [x] Permitir cargar documentos digitales usando almacenamiento seguro y metadatos en base de datos.
+- [x] Permitir autogestión de prematrícula para prospectos y estudiantes autorizados.
 
 ### Gestión académica ampliada
 - [ ] Añadir horarios por materia, grupo, docente, aula y período.
