@@ -365,3 +365,16 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [ ] Añadir migraciones, helpers, procedimientos tRPC y pruebas por cada módulo.
 - [ ] Validar aislamiento multiinstitución, permisos, responsive y flujos críticos.
 - [ ] Publicar entregas modulares documentando lo implementado y lo pendiente.
+
+## Sistema integral de exámenes
+
+- [x] Modelar exámenes, preguntas, opciones, respuestas, intentos, rúbricas y estados de calificación.
+- [x] Soportar preguntas abiertas, selección única, selección múltiple, falso/verdadero, completar, relacionar y ordenar.
+- [x] Permitir al tutor crear exámenes manualmente con puntajes, instrucciones, tiempo y número de intentos.
+- [x] Generar exámenes y bancos de preguntas con IA a partir de una materia o módulo, con revisión antes de publicar.
+- [x] Implementar presentación del examen dentro del portal con navegación, temporizador, guardado y envío seguro.
+- [x] Exigir permiso de cámara y micrófono antes de iniciar, mostrar estado durante el intento y registrar únicamente eventos técnicos de supervisión.
+- [x] Calificar automáticamente preguntas objetivas y enviar preguntas abiertas a revisión del tutor.
+- [x] Permitir al tutor revisar respuestas, asignar puntajes, comentarios y publicar la nota final.
+- [x] Sincronizar resultados del examen con las notas y el progreso académico del estudiante.
+- [x] Añadir pruebas de permisos, aislamiento institucional, privacidad de medios, calificación y experiencia responsive.

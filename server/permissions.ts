@@ -16,3 +16,13 @@ export function canManageCommercial(role: AcademicRole) {
 export function canReviewAdmissions(role: AcademicRole) {
   return normaliseAcademicRole(role) === "admin";
 }
+
+export function canManageExams(role: AcademicRole) {
+  const normalised = normaliseAcademicRole(role);
+  return normalised === "admin" || normalised === "teacher";
+}
+
+export function canReviewExams(role: AcademicRole) {
+  const normalised = normaliseAcademicRole(role);
+  return normalised === "admin" || normalised === "teacher";
+}

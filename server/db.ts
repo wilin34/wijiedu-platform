@@ -13,6 +13,11 @@ import {
   financialPayments,
   lmsContents,
   lmsContentProgress,
+  exams,
+  examQuestions,
+  examAttempts,
+  examAnswers,
+  examProctoringEvents,
   competencies,
   courseLessons,
   courseModules,
@@ -1409,4 +1414,103 @@ export async function markLmsContentComplete(input: { institutionId: number; con
   if (!content) return undefined;
   await db.insert(lmsContentProgress).values({ institutionId: input.institutionId, contentId: input.contentId, studentId: input.studentId, completedAt: input.completed ? new Date() : null }).onDuplicateKeyUpdate({ set: { completedAt: input.completed ? new Date() : null, lastViewedAt: new Date() } });
   return { contentId: input.contentId, completed: input.completed };
+}
+
+type ExamQuestionInput = { questionType: "open" | "single_choice" | "multiple_choice" | "true_false" | "fill_blank" | "matching" | "ordering"; prompt: string; options?: unknown; correctAnswer?: unknown; rubric?: string | null; points: number; sortOrder: number };
+
+export async function createExamWithQuestions(input: { institutionId: number; subjectId: number; moduleId?: number | null; title: string; description?: string | null; instructions?: string | null; durationMinutes: number; maxAttempts: number; requiresCamera: boolean; requiresMicrophone: boolean; createdBy: number; status: "draft" | "published" }, questions: ExamQuestionInput[]) {
+  const db = await requireDb();
+  const [subject] = await db.select().from(subjects).where(and(eq(subjects.id, input.subjectId), eq(subjects.institutionId, input.institutionId))).limit(1);
+  if (!subject) return undefined;
+  const result = await db.insert(exams).values({ ...input, requiresCamera: input.requiresCamera ? 1 : 0, requiresMicrophone: input.requiresMicrophone ? 1 : 0, publishedAt: input.status === "published" ? new Date() : null });
+  const examId = Number(result[0].insertId);
+  if (questions.length) await db.insert(examQuestions).values(questions.map(question => ({ ...question, institutionId: input.institutionId, examId, options: question.options == null ? null : JSON.stringify(question.options), correctAnswer: question.correctAnswer == null ? null : JSON.stringify(question.correctAnswer) })));
+  return db.select().from(exams).where(eq(exams.id, examId)).limit(1).then(rows => rows[0]);
+}
+
+export async function listExams(institutionId: number, subjectId?: number, studentId?: number) {
+  const db = await requireDb();
+  return db.select({ exam: exams, subjectName: subjects.name }).from(exams).innerJoin(subjects, and(eq(subjects.id, exams.subjectId), eq(subjects.institutionId, institutionId))).where(and(eq(exams.institutionId, institutionId), ...(subjectId ? [eq(exams.subjectId, subjectId)] : []), ...(studentId ? [eq(exams.status, "published")] : []))).orderBy(desc(exams.createdAt));
+}
+
+export async function getExamWithQuestions(examId: number, institutionId: number, studentId?: number) {
+  const db = await requireDb();
+  const filters = [eq(exams.id, examId), eq(exams.institutionId, institutionId)];
+  if (studentId) filters.push(eq(exams.status, "published"));
+  const [exam] = await db.select().from(exams).where(and(...filters)).limit(1);
+  if (!exam) return undefined;
+  const questions = await db.select().from(examQuestions).where(and(eq(examQuestions.examId, examId), eq(examQuestions.institutionId, institutionId))).orderBy(asc(examQuestions.sortOrder));
+  return { exam, questions: studentId ? questions.map(question => ({ ...question, correctAnswer: null })) : questions };
+}
+
+export async function startExamAttempt(input: { examId: number; institutionId: number; studentId: number; cameraGranted: boolean; microphoneGranted: boolean }) {
+  const db = await requireDb();
+  const [exam] = await db.select().from(exams).where(and(eq(exams.id, input.examId), eq(exams.institutionId, input.institutionId), eq(exams.status, "published"))).limit(1);
+  if (!exam) return undefined;
+  if ((exam.requiresCamera && !input.cameraGranted) || (exam.requiresMicrophone && !input.microphoneGranted)) throw new Error("Se requieren cámara y micrófono para iniciar el examen.");
+  const attempts = await db.select().from(examAttempts).where(and(eq(examAttempts.examId, input.examId), eq(examAttempts.institutionId, input.institutionId), eq(examAttempts.studentId, input.studentId)));
+  if (attempts.length >= exam.maxAttempts) throw new Error("Se alcanzó el número máximo de intentos permitido.");
+  const attemptNumber = attempts.length + 1;
+  const result = await db.insert(examAttempts).values({ examId: input.examId, institutionId: input.institutionId, studentId: input.studentId, attemptNumber, cameraGranted: input.cameraGranted ? 1 : 0, microphoneGranted: input.microphoneGranted ? 1 : 0, status: "in_progress" });
+  const attemptId = Number(result[0].insertId);
+  await db.insert(examProctoringEvents).values([{ institutionId: input.institutionId, attemptId, eventType: "camera_granted" }, { institutionId: input.institutionId, attemptId, eventType: "microphone_granted" }]);
+  return { attemptId, examId: input.examId, attemptNumber, durationMinutes: exam.durationMinutes };
+}
+
+function normalizedAnswer(value: unknown) { return JSON.stringify(value).trim().toLowerCase(); }
+
+export async function submitExamAttempt(input: { attemptId: number; institutionId: number; studentId: number; answers: Array<{ questionId: number; answer: unknown }> }) {
+  const db = await requireDb();
+  const [attempt] = await db.select().from(examAttempts).where(and(eq(examAttempts.id, input.attemptId), eq(examAttempts.institutionId, input.institutionId), eq(examAttempts.studentId, input.studentId), eq(examAttempts.status, "in_progress"))).limit(1);
+  if (!attempt) return undefined;
+  const questions = await db.select().from(examQuestions).where(and(eq(examQuestions.examId, attempt.examId), eq(examQuestions.institutionId, input.institutionId)));
+  let autoScore = 0;
+  const values = input.answers.map(answer => {
+    const question = questions.find(item => item.id === answer.questionId);
+    const objective = question && question.questionType !== "open";
+    const isCorrect = objective && question.correctAnswer != null && normalizedAnswer(answer.answer) === normalizedAnswer(JSON.parse(question.correctAnswer));
+    const score = isCorrect ? question.points : 0;
+    if (objective) autoScore += score;
+    return { institutionId: input.institutionId, attemptId: input.attemptId, questionId: answer.questionId, answer: JSON.stringify(answer.answer), autoScore: objective ? score : null, isReviewed: objective ? 1 : 0 };
+  });
+  if (values.length) await db.insert(examAnswers).values(values);
+  const hasOpen = questions.some(question => question.questionType === "open");
+  await db.update(examAttempts).set({ status: hasOpen ? "under_review" : "graded", submittedAt: new Date(), autoScore, finalScore: hasOpen ? null : autoScore }).where(eq(examAttempts.id, input.attemptId));
+  return { attemptId: input.attemptId, autoScore, requiresTutorReview: hasOpen };
+}
+
+export async function addExamProctoringEvent(input: { attemptId: number; institutionId: number; studentId: number; eventType: "camera_granted" | "camera_revoked" | "microphone_granted" | "microphone_revoked" | "fullscreen_entered" | "fullscreen_exited" | "tab_hidden" | "tab_visible" | "technical_error" }) {
+  const db = await requireDb();
+  const [attempt] = await db.select().from(examAttempts).where(and(eq(examAttempts.id, input.attemptId), eq(examAttempts.institutionId, input.institutionId), eq(examAttempts.studentId, input.studentId))).limit(1);
+  if (!attempt) return undefined;
+  await db.insert(examProctoringEvents).values({ attemptId: input.attemptId, institutionId: input.institutionId, eventType: input.eventType });
+  return { ok: true };
+}
+
+export async function listExamAttemptsForTeacher(examId: number, institutionId: number) {
+  const db = await requireDb();
+  return db.select({ attempt: examAttempts, studentName: students.fullName }).from(examAttempts).innerJoin(students, and(eq(students.id, examAttempts.studentId), eq(students.institutionId, institutionId))).where(and(eq(examAttempts.examId, examId), eq(examAttempts.institutionId, institutionId))).orderBy(desc(examAttempts.startedAt));
+}
+
+export async function getExamAttemptForTeacher(attemptId: number, institutionId: number) {
+  const db = await requireDb();
+  const [attempt] = await db.select().from(examAttempts).where(and(eq(examAttempts.id, attemptId), eq(examAttempts.institutionId, institutionId))).limit(1);
+  if (!attempt) return undefined;
+  const answers = await db.select().from(examAnswers).where(and(eq(examAnswers.attemptId, attemptId), eq(examAnswers.institutionId, institutionId)));
+  const questions = await db.select().from(examQuestions).where(and(eq(examQuestions.examId, attempt.examId), eq(examQuestions.institutionId, institutionId)));
+  const [exam] = await db.select().from(exams).where(and(eq(exams.id, attempt.examId), eq(exams.institutionId, institutionId))).limit(1);
+  return { attempt, answers, questions, exam };
+
+}
+
+export async function gradeExamAttempt(input: { attemptId: number; institutionId: number; manualScores: Array<{ answerId: number; score: number; feedback?: string | null }>; tutorFeedback?: string | null }) {
+  const db = await requireDb();
+  const [attempt] = await db.select().from(examAttempts).where(and(eq(examAttempts.id, input.attemptId), eq(examAttempts.institutionId, input.institutionId))).limit(1);
+  if (!attempt) return undefined;
+  for (const item of input.manualScores) await db.update(examAnswers).set({ manualScore: item.score, feedback: item.feedback ?? null, isReviewed: 1 }).where(and(eq(examAnswers.id, item.answerId), eq(examAnswers.attemptId, input.attemptId), eq(examAnswers.institutionId, input.institutionId)));
+  const total = input.manualScores.reduce((sum, item) => sum + item.score, 0) + (attempt.autoScore ?? 0);
+  const questions = await db.select({ points: examQuestions.points }).from(examQuestions).where(and(eq(examQuestions.examId, attempt.examId), eq(examQuestions.institutionId, input.institutionId)));
+  const maxScore = questions.reduce((sum, item) => sum + item.points, 0);
+  await db.update(examAttempts).set({ manualScore: input.manualScores.reduce((sum, item) => sum + item.score, 0), finalScore: total, tutorFeedback: input.tutorFeedback ?? null, status: "graded" }).where(eq(examAttempts.id, input.attemptId));
+  return { attemptId: input.attemptId, finalScore: total, maxScore, studentId: attempt.studentId, examId: attempt.examId, status: "graded" as const };
 }

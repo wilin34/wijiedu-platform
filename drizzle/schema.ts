@@ -471,3 +471,75 @@ export type FinancialExpense = typeof financialExpenses.$inferSelect;
 export type LmsContent = typeof lmsContents.$inferSelect;
 export type WellbeingSurvey = typeof wellbeingSurveys.$inferSelect;
 export type AlumniProfile = typeof alumniProfiles.$inferSelect;
+
+
+export const exams = mysqlTable("exams", {
+  id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").notNull(),
+  subjectId: int("subjectId").notNull(),
+  moduleId: int("moduleId"),
+  title: varchar("title", { length: 220 }).notNull(),
+  description: text("description"),
+  instructions: text("instructions"),
+  durationMinutes: int("durationMinutes").default(60).notNull(),
+  maxAttempts: int("maxAttempts").default(1).notNull(),
+  requiresCamera: int("requiresCamera").default(1).notNull(),
+  requiresMicrophone: int("requiresMicrophone").default(1).notNull(),
+  status: mysqlEnum("status", ["draft", "published", "closed"]).default("draft").notNull(),
+  createdBy: int("createdBy").notNull(),
+  publishedAt: timestamp("publishedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const examQuestions = mysqlTable("exam_questions", {
+  id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").notNull(),
+  examId: int("examId").notNull(),
+  questionType: mysqlEnum("questionType", ["open", "single_choice", "multiple_choice", "true_false", "fill_blank", "matching", "ordering"]).notNull(),
+  prompt: text("prompt").notNull(),
+  options: text("options"),
+  correctAnswer: text("correctAnswer"),
+  rubric: text("rubric"),
+  points: int("points").default(1).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const examAttempts = mysqlTable("exam_attempts", {
+  id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").notNull(),
+  examId: int("examId").notNull(),
+  studentId: int("studentId").notNull(),
+  attemptNumber: int("attemptNumber").notNull(),
+  status: mysqlEnum("status", ["in_progress", "submitted", "under_review", "graded", "cancelled"]).default("in_progress").notNull(),
+  cameraGranted: int("cameraGranted").default(0).notNull(),
+  microphoneGranted: int("microphoneGranted").default(0).notNull(),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  submittedAt: timestamp("submittedAt"),
+  autoScore: int("autoScore"),
+  manualScore: int("manualScore"),
+  finalScore: int("finalScore"),
+  tutorFeedback: text("tutorFeedback"),
+});
+
+export const examAnswers = mysqlTable("exam_answers", {
+  id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").notNull(),
+  attemptId: int("attemptId").notNull(),
+  questionId: int("questionId").notNull(),
+  answer: text("answer").notNull(),
+  autoScore: int("autoScore"),
+  manualScore: int("manualScore"),
+  feedback: text("feedback"),
+  isReviewed: int("isReviewed").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const examProctoringEvents = mysqlTable("exam_proctoring_events", {
+  id: int("id").autoincrement().primaryKey(),
+  institutionId: int("institutionId").notNull(),
+  attemptId: int("attemptId").notNull(),
+  eventType: mysqlEnum("eventType", ["camera_granted", "camera_revoked", "microphone_granted", "microphone_revoked", "fullscreen_entered", "fullscreen_exited", "tab_hidden", "tab_visible", "technical_error"]).notNull(),
+  occurredAt: timestamp("occurredAt").defaultNow().notNull(),
+});
