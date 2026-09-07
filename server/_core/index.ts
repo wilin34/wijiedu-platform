@@ -7,6 +7,8 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { sdk } from "./sdk";
+import * as db from "../db";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -36,6 +38,20 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  app.post("/api/scheduled/wellbeing-surveys", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron) return res.status(403).json({ error: "cron-only" });
+      const institutions = await db.listInstitutions();
+      const results = [];
+      for (const institution of institutions) {
+        results.push({ institutionId: institution.id, periodEnd: await db.triggerWellbeingNotifications(institution.id, "period_end"), annualAlumni: await db.triggerWellbeingNotifications(institution.id, "annual_alumni") });
+      }
+      return res.json({ ok: true, results });
+    } catch (error) {
+      return res.status(500).json({ error: error instanceof Error ? error.message : "wellbeing-schedule-failed", timestamp: new Date().toISOString() });
+    }
+  });
   // tRPC API
   app.use(
     "/api/trpc",

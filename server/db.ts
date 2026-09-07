@@ -42,6 +42,12 @@ import {
   subjects,
   studyPlans,
   studyPlanSubjects,
+  wellbeingSurveys,
+  wellbeingSurveyQuestions,
+  wellbeingSurveyResponses,
+  wellbeingSurveyAnswers,
+  alumniProfiles,
+  alumniInteractions,
   submissions,
   users,
 } from "../drizzle/schema";
@@ -1391,6 +1397,7 @@ export async function listFinancialExpenses(institutionId: number) {
 }
 
 export async function listLmsContents(institutionId: number, subjectId?: number, studentId?: number) {
+  if (studentId && (await getFinancialAccessStatus(institutionId, studentId)).blocked) return [];
   const db = await requireDb();
   const rows = await db.select({ content: lmsContents, subjectName: subjects.name }).from(lmsContents).innerJoin(subjects, and(eq(subjects.id, lmsContents.subjectId), eq(subjects.institutionId, institutionId))).where(and(eq(lmsContents.institutionId, institutionId), ...(subjectId ? [eq(lmsContents.subjectId, subjectId)] : []), ...(studentId ? [eq(lmsContents.published, 1)] : []))).orderBy(asc(lmsContents.sortOrder), asc(lmsContents.createdAt));
   if (!studentId) return rows;
@@ -1447,6 +1454,7 @@ export async function startExamAttempt(input: { examId: number; institutionId: n
   const db = await requireDb();
   const [exam] = await db.select().from(exams).where(and(eq(exams.id, input.examId), eq(exams.institutionId, input.institutionId), eq(exams.status, "published"))).limit(1);
   if (!exam) return undefined;
+  if ((await getFinancialAccessStatus(input.institutionId, input.studentId)).blocked) throw new Error("Tu acceso académico está bloqueado por mora. Comunícate con la institución.");
   if ((exam.requiresCamera && !input.cameraGranted) || (exam.requiresMicrophone && !input.microphoneGranted)) throw new Error("Se requieren cámara y micrófono para iniciar el examen.");
   const attempts = await db.select().from(examAttempts).where(and(eq(examAttempts.examId, input.examId), eq(examAttempts.institutionId, input.institutionId), eq(examAttempts.studentId, input.studentId)));
   if (attempts.length >= exam.maxAttempts) throw new Error("Se alcanzó el número máximo de intentos permitido.");
@@ -1513,4 +1521,124 @@ export async function gradeExamAttempt(input: { attemptId: number; institutionId
   const maxScore = questions.reduce((sum, item) => sum + item.points, 0);
   await db.update(examAttempts).set({ manualScore: input.manualScores.reduce((sum, item) => sum + item.score, 0), finalScore: total, tutorFeedback: input.tutorFeedback ?? null, status: "graded" }).where(eq(examAttempts.id, input.attemptId));
   return { attemptId: input.attemptId, finalScore: total, maxScore, studentId: attempt.studentId, examId: attempt.examId, status: "graded" as const };
+}
+
+export async function createStudyPlanWithSubjects(input: { institutionId: number; name: string; version: string; description?: string | null; createdBy: number }, entries: Array<{ subjectId: number; semester: number; credits: number; required: boolean }>) {
+  const db = await requireDb();
+  const validSubjects = entries.length ? await db.select({ id: subjects.id }).from(subjects).where(and(eq(subjects.institutionId, input.institutionId), inArray(subjects.id, entries.map(entry => entry.subjectId)))) : [];
+  if (validSubjects.length !== entries.length) return undefined;
+  const result = await db.insert(studyPlans).values({ ...input, active: 1 });
+  const planId = Number(result[0].insertId);
+  if (entries.length) await db.insert(studyPlanSubjects).values(entries.map(entry => ({ ...entry, studyPlanId: planId, institutionId: input.institutionId, required: entry.required ? 1 : 0 })));
+  return getStudyPlanById(planId, input.institutionId);
+}
+
+export async function listStudyPlansDetailed(institutionId: number) {
+  const db = await requireDb();
+  return db.select().from(studyPlans).where(eq(studyPlans.institutionId, institutionId)).orderBy(desc(studyPlans.createdAt));
+}
+
+export async function getStudyPlanById(planId: number, institutionId: number) {
+  const db = await requireDb();
+  const [plan] = await db.select().from(studyPlans).where(and(eq(studyPlans.id, planId), eq(studyPlans.institutionId, institutionId))).limit(1);
+  if (!plan) return undefined;
+  const subjectsInPlan = await db.select({ relation: studyPlanSubjects, subject: subjects }).from(studyPlanSubjects).innerJoin(subjects, and(eq(subjects.id, studyPlanSubjects.subjectId), eq(subjects.institutionId, institutionId))).where(and(eq(studyPlanSubjects.studyPlanId, planId), eq(studyPlanSubjects.institutionId, institutionId))).orderBy(asc(studyPlanSubjects.semester), asc(subjects.name));
+  const subjectIds = subjectsInPlan.map(item => item.subject.id);
+  const competenciesInPlan = subjectIds.length ? await db.select().from(competencies).where(and(eq(competencies.institutionId, institutionId), inArray(competencies.subjectId, subjectIds))) : [];
+  return { plan, subjects: subjectsInPlan, competencies: competenciesInPlan };
+}
+
+export async function refreshFinancialAccountStatus(institutionId: number, studentId: number) {
+  const db = await requireDb();
+  const [account] = await db.select().from(financialAccounts).where(and(eq(financialAccounts.institutionId, institutionId), eq(financialAccounts.studentId, studentId))).limit(1);
+  if (!account) return { status: "current" as const, balanceCents: 0, blocked: false };
+  const overdue = account.balanceCents > 0 && !!account.dueAt && account.dueAt.getTime() < Date.now();
+  const status = overdue ? "blocked" : account.balanceCents > 0 ? "current" : "current";
+  if (status !== account.status) await db.update(financialAccounts).set({ status, blockedAt: status === "blocked" ? account.blockedAt ?? new Date() : null }).where(and(eq(financialAccounts.id, account.id), eq(financialAccounts.institutionId, institutionId)));
+  return { status, balanceCents: account.balanceCents, blocked: status === "blocked" };
+}
+
+export async function getFinancialAccessStatus(institutionId: number, studentId: number) {
+  return refreshFinancialAccountStatus(institutionId, studentId);
+}
+
+export async function gradeLmsTask(input: { institutionId: number; contentId: number; studentId: number; score: number; maxScore: number; feedback?: string | null; gradedBy: number }) {
+  const db = await requireDb();
+  const [content] = await db.select().from(lmsContents).where(and(eq(lmsContents.id, input.contentId), eq(lmsContents.institutionId, input.institutionId), eq(lmsContents.contentType, "task"))).limit(1);
+  if (!content) return undefined;
+  const [student] = await db.select().from(students).where(and(eq(students.id, input.studentId), eq(students.institutionId, input.institutionId))).limit(1);
+  if (!student) return undefined;
+  const enrolled = await isStudentEnrolled(input.studentId, content.subjectId, input.institutionId);
+  if (!enrolled) return undefined;
+  const gradeId = await createGrade({ studentId: input.studentId, subjectId: content.subjectId, period: new Date().getFullYear().toString(), title: `LMS · ${content.title}`, score: input.score, maxScore: input.maxScore, notes: input.feedback ?? null, gradedBy: input.gradedBy, institutionId: input.institutionId });
+  return { gradeId, contentId: input.contentId, studentId: input.studentId, score: input.score, maxScore: input.maxScore };
+}
+
+export async function listWellbeingSurveys(institutionId: number, audience?: "students" | "teachers" | "alumni") {
+  const db = await requireDb();
+  return db.select().from(wellbeingSurveys).where(and(eq(wellbeingSurveys.institutionId, institutionId), eq(wellbeingSurveys.active, 1), ...(audience ? [eq(wellbeingSurveys.audience, audience)] : []))).orderBy(desc(wellbeingSurveys.createdAt));
+}
+
+export async function createWellbeingSurvey(input: { institutionId: number; title: string; audience: "students" | "teachers" | "alumni"; triggerType: "period_end" | "annual_alumni" | "manual"; anonymous: boolean; createdBy: number }, questions: Array<{ prompt: string; questionType: "scale" | "single_choice" | "text"; options?: string[] | null; sortOrder: number }>) {
+  const db = await requireDb();
+  const result = await db.insert(wellbeingSurveys).values({ ...input, anonymous: input.anonymous ? 1 : 0, active: 1 });
+  const surveyId = Number(result[0].insertId);
+  if (questions.length) await db.insert(wellbeingSurveyQuestions).values(questions.map(question => ({ ...question, institutionId: input.institutionId, surveyId, options: question.options ? JSON.stringify(question.options) : null })));
+  return { id: surveyId, survey: (await db.select().from(wellbeingSurveys).where(eq(wellbeingSurveys.id, surveyId)).limit(1))[0] };
+}
+
+export async function submitWellbeingResponse(input: { institutionId: number; surveyId: number; respondentUserId?: number | null }, answers: Array<{ questionId: number; answer: string }>) {
+  const db = await requireDb();
+  const [survey] = await db.select().from(wellbeingSurveys).where(and(eq(wellbeingSurveys.id, input.surveyId), eq(wellbeingSurveys.institutionId, input.institutionId), eq(wellbeingSurveys.active, 1))).limit(1);
+  if (!survey) return undefined;
+  const questions = await db.select().from(wellbeingSurveyQuestions).where(and(eq(wellbeingSurveyQuestions.surveyId, input.surveyId), eq(wellbeingSurveyQuestions.institutionId, input.institutionId)));
+  if (answers.some(answer => !questions.some(question => question.id === answer.questionId))) return undefined;
+  const response = await db.insert(wellbeingSurveyResponses).values({ ...input, respondentUserId: survey.anonymous ? null : input.respondentUserId ?? null });
+  const responseId = Number(response[0].insertId);
+  if (answers.length) await db.insert(wellbeingSurveyAnswers).values(answers.map(answer => ({ ...answer, responseId, institutionId: input.institutionId })));
+  return { responseId, surveyId: input.surveyId };
+}
+
+export async function listAlumniProfiles(institutionId: number) {
+  const db = await requireDb();
+  return db.select({ profile: alumniProfiles, studentName: students.fullName, email: users.email }).from(alumniProfiles).innerJoin(students, and(eq(students.id, alumniProfiles.studentId), eq(students.institutionId, institutionId))).leftJoin(users, eq(users.id, students.userId)).where(eq(alumniProfiles.institutionId, institutionId)).orderBy(desc(alumniProfiles.updatedAt));
+}
+
+export async function upsertAlumniProfile(input: { institutionId: number; studentId: number; graduationYear?: number | null; currentCompany?: string | null; jobTitle?: string | null; employmentStatus: "employed" | "self_employed" | "seeking" | "studying" | "unknown"; consentToContact: boolean; notes?: string | null }) {
+  const db = await requireDb();
+  const [student] = await db.select().from(students).where(and(eq(students.id, input.studentId), eq(students.institutionId, input.institutionId))).limit(1);
+  if (!student) return undefined;
+  await db.insert(alumniProfiles).values({ ...input, consentToContact: input.consentToContact ? 1 : 0 }).onDuplicateKeyUpdate({ set: { graduationYear: input.graduationYear ?? null, currentCompany: input.currentCompany ?? null, jobTitle: input.jobTitle ?? null, employmentStatus: input.employmentStatus, consentToContact: input.consentToContact ? 1 : 0, notes: input.notes ?? null } });
+  const [profile] = await db.select().from(alumniProfiles).where(and(eq(alumniProfiles.institutionId, input.institutionId), eq(alumniProfiles.studentId, input.studentId))).limit(1);
+  return profile;
+}
+
+export async function addAlumniInteraction(input: { institutionId: number; alumniProfileId: number; createdBy: number; interactionType: "call" | "email" | "event" | "survey" | "note"; summary: string }) {
+  const db = await requireDb();
+  const [profile] = await db.select().from(alumniProfiles).where(and(eq(alumniProfiles.id, input.alumniProfileId), eq(alumniProfiles.institutionId, input.institutionId))).limit(1);
+  if (!profile) return undefined;
+  const result = await db.insert(alumniInteractions).values(input);
+  await db.update(alumniProfiles).set({ lastContactAt: new Date() }).where(and(eq(alumniProfiles.id, input.alumniProfileId), eq(alumniProfiles.institutionId, input.institutionId)));
+  return (await db.select().from(alumniInteractions).where(eq(alumniInteractions.id, Number(result[0].insertId))).limit(1))[0];
+}
+
+export async function triggerWellbeingNotifications(institutionId: number, triggerType: "period_end" | "annual_alumni") {
+  const db = await requireDb();
+  const surveys = await db.select().from(wellbeingSurveys).where(and(eq(wellbeingSurveys.institutionId, institutionId), eq(wellbeingSurveys.triggerType, triggerType), eq(wellbeingSurveys.active, 1)));
+  let created = 0;
+  for (const survey of surveys) {
+    const recipients = survey.audience === "alumni"
+      ? await db.select({ userId: users.id }).from(alumniProfiles).innerJoin(students, and(eq(students.id, alumniProfiles.studentId), eq(students.institutionId, institutionId))).innerJoin(users, eq(users.id, students.userId)).where(and(eq(alumniProfiles.institutionId, institutionId), eq(alumniProfiles.consentToContact, 1)))
+      : survey.audience === "teachers"
+        ? await db.select({ userId: users.id }).from(users).innerJoin(institutionMemberships, and(eq(institutionMemberships.userId, users.id), eq(institutionMemberships.institutionId, institutionId))).where(eq(users.role, "teacher"))
+        : await db.select({ userId: users.id }).from(users).innerJoin(students, and(eq(students.userId, users.id), eq(students.institutionId, institutionId))).where(eq(users.role, "student"));
+    for (const recipient of recipients) {
+      const href = `?section=wellbeing&surveyId=${survey.id}`;
+      const [existing] = await db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.institutionId, institutionId), eq(notifications.userId, recipient.userId), eq(notifications.href, href))).limit(1);
+      if (existing) continue;
+      await db.insert(notifications).values({ institutionId, userId: recipient.userId, type: "system", title: survey.title, message: "Tu opinión nos ayuda a mejorar la experiencia institucional. Completa esta encuesta.", href });
+      created += 1;
+    }
+  }
+  return { surveys: surveys.length, notifications: created };
 }

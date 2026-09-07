@@ -342,23 +342,23 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 
 ### Gestión académica ampliada
 - [x] Añadir horarios por materia, grupo, docente, aula y período.
-- [ ] Añadir planes de estudio y relación con materias y competencias.
+- [x] Añadir planes de estudio y relación con materias y competencias.
 - [x] Generar certificados verificables con código QR y consulta pública segura.
 
 ### Gestión financiera
 - [x] Registrar conceptos de cobro, cartera, ingresos y egresos por institución.
-- [ ] Calcular estados de cuenta y mora sin mezclar instituciones.
-- [ ] Aplicar bloqueos automáticos de funciones académicas por mora según configuración institucional.
+- [x] Calcular estados de cuenta y mora sin mezclar instituciones.
+- [x] Aplicar bloqueos automáticos de funciones académicas por mora según configuración institucional.
 
 ### LMS
 - [x] Organizar lecturas, videos, tareas y recursos por materia y módulo.
-- [ ] Sincronizar entregas y resultados del LMS con las notas del docente.
+- [x] Sincronizar entregas y resultados del LMS con las notas del docente.
 - [x] Mantener permisos diferenciados para docentes, estudiantes y administración.
 
 ### Bienestar y egresados
-- [ ] Crear encuestas de satisfacción con respuestas aisladas por institución.
+- [x] Crear encuestas de satisfacción con respuestas aisladas por institución.
 - [ ] Automatizar invitaciones y recordatorios de encuestas mediante jobs compatibles con la plataforma.
-- [ ] Registrar seguimiento de egresados, contacto, situación laboral y actividades de vinculación.
+- [x] Registrar seguimiento de egresados, contacto, situación laboral y actividades de vinculación.
 
 ### Integración y calidad
 - [ ] Integrar navegación y dashboards por módulo y rol.
