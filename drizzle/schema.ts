@@ -345,3 +345,129 @@ export const notificationPreferences = mysqlTable(
   },
   table => ({ userInstitutionUnique: uniqueIndex("notification_preferences_user_institution_unique").on(table.userId, table.institutionId) })
 );
+
+// Plataforma institucional integral: módulos operativos adicionales.
+export const prospects = mysqlTable("prospects", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(),
+  fullName: varchar("fullName", { length: 180 }).notNull(), email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 32 }), documentId: varchar("documentId", { length: 64 }),
+  interestedProgram: varchar("interestedProgram", { length: 180 }), source: varchar("source", { length: 100 }),
+  status: mysqlEnum("status", ["new", "contacted", "interested", "admitted", "enrolled", "lost"]).default("new").notNull(),
+  ownerUserId: int("ownerUserId"), notes: text("notes"), convertedStudentId: int("convertedStudentId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({ emailIndex: uniqueIndex("prospects_institution_email_unique").on(table.institutionId, table.email) }));
+
+export const prospectActivities = mysqlTable("prospect_activities", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), prospectId: int("prospectId").notNull(),
+  createdBy: int("createdBy").notNull(), activityType: mysqlEnum("activityType", ["call", "email", "meeting", "note", "status_change"]).notNull(),
+  summary: varchar("summary", { length: 500 }).notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const admissionApplications = mysqlTable("admission_applications", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), prospectId: int("prospectId"), applicantUserId: int("applicantUserId"),
+  programName: varchar("programName", { length: 180 }).notNull(), status: mysqlEnum("status", ["draft", "submitted", "under_review", "approved", "rejected", "enrolled"]).default("draft").notNull(),
+  submittedAt: timestamp("submittedAt"), reviewedBy: int("reviewedBy"), reviewedAt: timestamp("reviewedAt"), reviewNotes: text("reviewNotes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const admissionDocuments = mysqlTable("admission_documents", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), applicationId: int("applicationId").notNull(),
+  documentType: varchar("documentType", { length: 100 }).notNull(), originalName: varchar("originalName", { length: 255 }).notNull(),
+  fileKey: varchar("fileKey", { length: 512 }).notNull(), fileUrl: varchar("fileUrl", { length: 1024 }).notNull(),
+  status: mysqlEnum("status", ["pending", "accepted", "rejected"]).default("pending").notNull(), reviewedBy: int("reviewedBy"), reviewedAt: timestamp("reviewedAt"), rejectionReason: text("rejectionReason"),
+  uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
+});
+
+export const preEnrollmentRequests = mysqlTable("pre_enrollment_requests", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), applicationId: int("applicationId").notNull(), period: varchar("period", { length: 60 }).notNull(),
+  status: mysqlEnum("status", ["submitted", "under_review", "approved", "rejected", "completed"]).default("submitted").notNull(), requestedAt: timestamp("requestedAt").defaultNow().notNull(),
+  processedBy: int("processedBy"), processedAt: timestamp("processedAt"), notes: text("notes"),
+});
+
+export const academicPeriods = mysqlTable("academic_periods", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), name: varchar("name", { length: 100 }).notNull(),
+  startsAt: timestamp("startsAt").notNull(), endsAt: timestamp("endsAt").notNull(), status: mysqlEnum("status", ["planned", "active", "closed"]).default("planned").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const classSchedules = mysqlTable("class_schedules", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), subjectId: int("subjectId").notNull(), periodId: int("periodId").notNull(), teacherId: int("teacherId"),
+  weekday: int("weekday").notNull(), startsAt: varchar("startsAt", { length: 5 }).notNull(), endsAt: varchar("endsAt", { length: 5 }).notNull(), classroom: varchar("classroom", { length: 120 }),
+  modality: mysqlEnum("modality", ["onsite", "virtual", "hybrid"]).default("onsite").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const studyPlans = mysqlTable("study_plans", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), name: varchar("name", { length: 180 }).notNull(), version: varchar("version", { length: 40 }).notNull(),
+  description: text("description"), active: int("active").default(1).notNull(), createdBy: int("createdBy").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const studyPlanSubjects = mysqlTable("study_plan_subjects", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), studyPlanId: int("studyPlanId").notNull(), subjectId: int("subjectId").notNull(), semester: int("semester").notNull(), credits: int("credits").default(0).notNull(), required: int("required").default(1).notNull(),
+});
+
+export const certificates = mysqlTable("certificates", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), studentId: int("studentId").notNull(), certificateType: varchar("certificateType", { length: 120 }).notNull(),
+  certificateNumber: varchar("certificateNumber", { length: 100 }).notNull(), verificationToken: varchar("verificationToken", { length: 128 }).notNull(), issuedBy: int("issuedBy").notNull(), issuedAt: timestamp("issuedAt").defaultNow().notNull(), revokedAt: timestamp("revokedAt"),
+}, table => ({ numberUnique: uniqueIndex("certificates_institution_number_unique").on(table.institutionId, table.certificateNumber), tokenUnique: uniqueIndex("certificates_verification_token_unique").on(table.verificationToken) }));
+
+export const financialAccounts = mysqlTable("financial_accounts", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), studentId: int("studentId").notNull(), status: mysqlEnum("status", ["current", "overdue", "blocked"]).default("current").notNull(), balanceCents: int("balanceCents").default(0).notNull(), dueAt: timestamp("dueAt"), blockedAt: timestamp("blockedAt"), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const financialCharges = mysqlTable("financial_charges", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), studentId: int("studentId").notNull(), concept: varchar("concept", { length: 180 }).notNull(), amountCents: int("amountCents").notNull(), dueAt: timestamp("dueAt").notNull(), status: mysqlEnum("status", ["pending", "partially_paid", "paid", "overdue", "cancelled"]).default("pending").notNull(), createdBy: int("createdBy").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const financialPayments = mysqlTable("financial_payments", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), studentId: int("studentId").notNull(), chargeId: int("chargeId"), amountCents: int("amountCents").notNull(), paymentMethod: varchar("paymentMethod", { length: 80 }).notNull(), reference: varchar("reference", { length: 120 }), receivedBy: int("receivedBy").notNull(), paidAt: timestamp("paidAt").defaultNow().notNull(),
+});
+
+export const financialExpenses = mysqlTable("financial_expenses", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), concept: varchar("concept", { length: 180 }).notNull(), amountCents: int("amountCents").notNull(), category: varchar("category", { length: 100 }).notNull(), incurredAt: timestamp("incurredAt").notNull(), createdBy: int("createdBy").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const lmsContents = mysqlTable("lms_contents", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), subjectId: int("subjectId").notNull(), moduleId: int("moduleId"), title: varchar("title", { length: 220 }).notNull(), contentType: mysqlEnum("contentType", ["reading", "video", "link", "file", "task"]).notNull(), body: text("body"), url: varchar("url", { length: 1024 }), fileKey: varchar("fileKey", { length: 512 }), sortOrder: int("sortOrder").default(0).notNull(), published: int("published").default(0).notNull(), createdBy: int("createdBy").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const lmsContentProgress = mysqlTable("lms_content_progress", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), contentId: int("contentId").notNull(), studentId: int("studentId").notNull(), completedAt: timestamp("completedAt"), lastViewedAt: timestamp("lastViewedAt").defaultNow().notNull(),
+}, table => ({ progressUnique: uniqueIndex("lms_content_student_unique").on(table.contentId, table.studentId) }));
+
+export const wellbeingSurveys = mysqlTable("wellbeing_surveys", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), title: varchar("title", { length: 220 }).notNull(), audience: mysqlEnum("audience", ["students", "teachers", "alumni"]).notNull(), triggerType: mysqlEnum("triggerType", ["period_end", "annual_alumni", "manual"]).notNull(), anonymous: int("anonymous").default(0).notNull(), active: int("active").default(1).notNull(), createdBy: int("createdBy").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const wellbeingSurveyQuestions = mysqlTable("wellbeing_survey_questions", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), surveyId: int("surveyId").notNull(), prompt: varchar("prompt", { length: 500 }).notNull(), questionType: mysqlEnum("questionType", ["scale", "single_choice", "text"]).notNull(), options: text("options"), sortOrder: int("sortOrder").default(0).notNull(),
+});
+
+export const wellbeingSurveyResponses = mysqlTable("wellbeing_survey_responses", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), surveyId: int("surveyId").notNull(), respondentUserId: int("respondentUserId"), submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+});
+
+export const wellbeingSurveyAnswers = mysqlTable("wellbeing_survey_answers", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), responseId: int("responseId").notNull(), questionId: int("questionId").notNull(), answer: text("answer").notNull(),
+});
+
+export const alumniProfiles = mysqlTable("alumni_profiles", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), studentId: int("studentId").notNull(), graduationYear: int("graduationYear"), currentCompany: varchar("currentCompany", { length: 180 }), jobTitle: varchar("jobTitle", { length: 180 }), employmentStatus: mysqlEnum("employmentStatus", ["employed", "self_employed", "seeking", "studying", "unknown"]).default("unknown").notNull(), consentToContact: int("consentToContact").default(0).notNull(), lastContactAt: timestamp("lastContactAt"), notes: text("notes"), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const alumniInteractions = mysqlTable("alumni_interactions", {
+  id: int("id").autoincrement().primaryKey(), institutionId: int("institutionId").notNull(), alumniProfileId: int("alumniProfileId").notNull(), createdBy: int("createdBy").notNull(), interactionType: mysqlEnum("interactionType", ["call", "email", "event", "survey", "note"]).notNull(), summary: text("summary").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Prospect = typeof prospects.$inferSelect;
+export type AdmissionApplication = typeof admissionApplications.$inferSelect;
+export type AdmissionDocument = typeof admissionDocuments.$inferSelect;
+export type AcademicPeriod = typeof academicPeriods.$inferSelect;
+export type ClassSchedule = typeof classSchedules.$inferSelect;
+export type StudyPlan = typeof studyPlans.$inferSelect;
+export type Certificate = typeof certificates.$inferSelect;
+export type FinancialAccount = typeof financialAccounts.$inferSelect;
+export type FinancialCharge = typeof financialCharges.$inferSelect;
+export type FinancialPayment = typeof financialPayments.$inferSelect;
+export type FinancialExpense = typeof financialExpenses.$inferSelect;
+export type LmsContent = typeof lmsContents.$inferSelect;
+export type WellbeingSurvey = typeof wellbeingSurveys.$inferSelect;
+export type AlumniProfile = typeof alumniProfiles.$inferSelect;

@@ -8,3 +8,11 @@ export function canManageAcademicContent(role: AcademicRole) {
   const normalised = normaliseAcademicRole(role);
   return normalised === "admin" || normalised === "teacher";
 }
+
+export function canManageCommercial(role: AcademicRole) {
+  return normaliseAcademicRole(role) === "admin";
+}
+
+export function canReviewAdmissions(role: AcademicRole) {
+  return normaliseAcademicRole(role) === "admin";
+}

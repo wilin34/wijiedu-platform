@@ -2,12 +2,17 @@ import { and, asc, avg, count, desc, eq, inArray, isNull, like, or, sql } from "
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   activities,
+  academicPeriods,
+  admissionApplications,
+  admissionDocuments,
   competencies,
   courseLessons,
   courseModules,
   courseResources,
   enrollments,
   grades,
+  prospects,
+  prospectActivities,
   InsertUser,
   institutionMemberships,
   institutions,
@@ -18,6 +23,7 @@ import {
   moduleAssessments,
   notificationPreferences,
   notifications,
+  preEnrollmentRequests,
   recoveryRequests,
   students,
   subjects,
@@ -1139,4 +1145,136 @@ export async function getDashboardStats(user: { id: number; role: string; email?
 export async function updateAccountPassword(userId: number, passwordHash: string) {
   const db = await requireDb();
   await db.update(users).set({ passwordHash, sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId));
+}
+
+export async function listProspects(institutionId: number, status?: "new" | "contacted" | "interested" | "admitted" | "enrolled" | "lost") {
+  const db = await requireDb();
+  const filters = [eq(prospects.institutionId, institutionId)];
+  if (status) filters.push(eq(prospects.status, status));
+  return db.select().from(prospects).where(and(...filters)).orderBy(desc(prospects.createdAt));
+}
+
+export async function getProspectById(id: number, institutionId: number) {
+  const db = await requireDb();
+  const [prospect] = await db.select().from(prospects).where(and(eq(prospects.id, id), eq(prospects.institutionId, institutionId))).limit(1);
+  return prospect;
+}
+
+export async function createProspect(input: {
+  institutionId: number; fullName: string; email: string; phone?: string | null; documentId?: string | null;
+  interestedProgram?: string | null; source?: string | null; ownerUserId?: number | null; notes?: string | null;
+}) {
+  const db = await requireDb();
+  const result = await db.insert(prospects).values({ ...input, email: input.email.toLowerCase(), status: "new" });
+  const [created] = await db.select().from(prospects).where(eq(prospects.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function updateProspect(id: number, institutionId: number, input: Partial<{
+  fullName: string; email: string; phone: string | null; documentId: string | null; interestedProgram: string | null;
+  source: string | null; status: "new" | "contacted" | "interested" | "admitted" | "enrolled" | "lost"; ownerUserId: number | null; notes: string | null;
+}>, actorId: number) {
+  const db = await requireDb();
+  const current = await getProspectById(id, institutionId);
+  if (!current) return undefined;
+  await db.transaction(async tx => {
+    await tx.update(prospects).set({ ...input, ...(input.email ? { email: input.email.toLowerCase() } : {}) }).where(and(eq(prospects.id, id), eq(prospects.institutionId, institutionId)));
+    if (input.status && input.status !== current.status) {
+      await tx.insert(prospectActivities).values({ institutionId, prospectId: id, createdBy: actorId, activityType: "status_change", summary: `Estado cambiado de ${current.status} a ${input.status}` });
+    }
+  });
+  return getProspectById(id, institutionId);
+}
+
+export async function addProspectActivity(input: { institutionId: number; prospectId: number; createdBy: number; activityType: "call" | "email" | "meeting" | "note" | "status_change"; summary: string }) {
+  const db = await requireDb();
+  const prospect = await getProspectById(input.prospectId, input.institutionId);
+  if (!prospect) return undefined;
+  const result = await db.insert(prospectActivities).values(input);
+  const [created] = await db.select().from(prospectActivities).where(eq(prospectActivities.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function listProspectActivities(prospectId: number, institutionId: number) {
+  const db = await requireDb();
+  return db.select().from(prospectActivities).where(and(eq(prospectActivities.prospectId, prospectId), eq(prospectActivities.institutionId, institutionId))).orderBy(desc(prospectActivities.createdAt));
+}
+
+export async function convertProspectToStudent(input: { prospectId: number; institutionId: number; actorId: number }) {
+  const db = await requireDb();
+  const prospect = await getProspectById(input.prospectId, input.institutionId);
+  if (!prospect) return undefined;
+  const [existing] = await db.select().from(students).where(and(eq(students.institutionId, input.institutionId), eq(students.email, prospect.email))).limit(1);
+  if (existing) {
+    await updateProspect(input.prospectId, input.institutionId, { status: "enrolled", convertedStudentId: existing.id } as never, input.actorId);
+    return existing;
+  }
+  const result = await db.insert(students).values({ institutionId: input.institutionId, fullName: prospect.fullName, email: prospect.email, documentId: prospect.documentId, phone: prospect.phone, status: "active" });
+  const studentId = Number(result[0].insertId);
+  await updateProspect(input.prospectId, input.institutionId, { status: "enrolled", convertedStudentId: studentId } as never, input.actorId);
+  return db.select().from(students).where(eq(students.id, studentId)).limit(1).then(rows => rows[0]);
+}
+
+export async function listAdmissionApplications(institutionId: number) {
+  const db = await requireDb();
+  return db.select({ application: admissionApplications, prospectName: prospects.fullName, prospectEmail: prospects.email })
+    .from(admissionApplications)
+    .leftJoin(prospects, eq(prospects.id, admissionApplications.prospectId))
+    .where(eq(admissionApplications.institutionId, institutionId))
+    .orderBy(desc(admissionApplications.createdAt));
+}
+
+export async function getAdmissionApplication(id: number, institutionId: number) {
+  const db = await requireDb();
+  const [application] = await db.select().from(admissionApplications).where(and(eq(admissionApplications.id, id), eq(admissionApplications.institutionId, institutionId))).limit(1);
+  return application;
+}
+
+export async function createAdmissionApplication(input: { institutionId: number; prospectId?: number | null; applicantUserId?: number | null; programName: string }) {
+  const db = await requireDb();
+  if (input.prospectId && !(await getProspectById(input.prospectId, input.institutionId))) return undefined;
+  const result = await db.insert(admissionApplications).values({ ...input, status: "submitted", submittedAt: new Date() });
+  const [created] = await db.select().from(admissionApplications).where(eq(admissionApplications.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function updateAdmissionApplication(input: { id: number; institutionId: number; status: "draft" | "submitted" | "under_review" | "approved" | "rejected" | "enrolled"; reviewedBy?: number; reviewNotes?: string | null }) {
+  const db = await requireDb();
+  const current = await getAdmissionApplication(input.id, input.institutionId);
+  if (!current) return undefined;
+  await db.update(admissionApplications).set({ status: input.status, reviewedBy: input.reviewedBy ?? null, reviewedAt: input.reviewedBy ? new Date() : null, reviewNotes: input.reviewNotes ?? null }).where(and(eq(admissionApplications.id, input.id), eq(admissionApplications.institutionId, input.institutionId)));
+  return getAdmissionApplication(input.id, input.institutionId);
+}
+
+export async function listAdmissionDocuments(applicationId: number, institutionId: number) {
+  const db = await requireDb();
+  return db.select().from(admissionDocuments).where(and(eq(admissionDocuments.applicationId, applicationId), eq(admissionDocuments.institutionId, institutionId))).orderBy(desc(admissionDocuments.uploadedAt));
+}
+
+export async function addAdmissionDocument(input: { institutionId: number; applicationId: number; documentType: string; originalName: string; fileKey: string; fileUrl: string }) {
+  const db = await requireDb();
+  if (!(await getAdmissionApplication(input.applicationId, input.institutionId))) return undefined;
+  const result = await db.insert(admissionDocuments).values({ ...input, status: "pending" });
+  const [created] = await db.select().from(admissionDocuments).where(eq(admissionDocuments.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function reviewAdmissionDocument(input: { id: number; institutionId: number; status: "pending" | "accepted" | "rejected"; reviewedBy: number; rejectionReason?: string | null }) {
+  const db = await requireDb();
+  await db.update(admissionDocuments).set({ status: input.status, reviewedBy: input.reviewedBy, reviewedAt: new Date(), rejectionReason: input.rejectionReason ?? null }).where(and(eq(admissionDocuments.id, input.id), eq(admissionDocuments.institutionId, input.institutionId)));
+  const [document] = await db.select().from(admissionDocuments).where(and(eq(admissionDocuments.id, input.id), eq(admissionDocuments.institutionId, input.institutionId))).limit(1);
+  return document;
+}
+
+export async function createPreEnrollmentRequest(input: { institutionId: number; applicationId: number; period: string }) {
+  const db = await requireDb();
+  if (!(await getAdmissionApplication(input.applicationId, input.institutionId))) return undefined;
+  const result = await db.insert(preEnrollmentRequests).values({ ...input, status: "submitted" });
+  const [created] = await db.select().from(preEnrollmentRequests).where(eq(preEnrollmentRequests.id, Number(result[0].insertId))).limit(1);
+  return created;
+}
+
+export async function listPreEnrollmentRequests(institutionId: number) {
+  const db = await requireDb();
+  return db.select().from(preEnrollmentRequests).where(eq(preEnrollmentRequests.institutionId, institutionId)).orderBy(desc(preEnrollmentRequests.requestedAt));
 }

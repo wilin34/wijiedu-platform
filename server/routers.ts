@@ -11,6 +11,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { academicRouter } from "./routers/academic";
 import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
+import { canManageCommercial } from "./permissions";
 
 const scrypt = promisify(scryptCallback);
 const localAccountInput = z.object({
@@ -27,6 +28,10 @@ async function hashPassword(password: string) {
 
 function isPlatformOwner(user: { openId?: string | null; email?: string | null; role?: string }) {
   return user.role === "admin" && (user.openId === ENV.ownerOpenId || user.email?.trim().toLowerCase() === "wilinton@gmail.com");
+}
+
+function assertInstitutionAdmin(user: { role?: string }) {
+  if (!canManageCommercial((user.role || "student") as "admin" | "teacher" | "student" | "user")) throw new TRPCError({ code: "FORBIDDEN", message: "Solo el administrador institucional puede gestionar este módulo." });
 }
 
 async function passwordMatches(password: string, savedHash: string) {
@@ -134,6 +139,88 @@ export const appRouter = router({
       return { id: created?.id, created: true };
     }),
 
+  }),
+  commercial: router({
+    listProspects: protectedProcedure.input(z.object({ status: z.enum(["new", "contacted", "interested", "admitted", "enrolled", "lost"]).optional() }).optional()).query(async ({ ctx, input }) => {
+      assertInstitutionAdmin(ctx.user);
+      return db.listProspects(ctx.institutionId ?? 1, input?.status);
+    }),
+    activities: protectedProcedure.input(z.object({ prospectId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      assertInstitutionAdmin(ctx.user);
+      const prospect = await db.getProspectById(input.prospectId, ctx.institutionId ?? 1);
+      if (!prospect) throw new TRPCError({ code: "NOT_FOUND", message: "Prospecto no encontrado." });
+      return db.listProspectActivities(input.prospectId, ctx.institutionId ?? 1);
+    }),
+    createProspect: protectedProcedure.input(z.object({ fullName: z.string().trim().min(2).max(180), email: z.string().trim().email().max(320), phone: z.string().trim().max(32).nullable().optional(), documentId: z.string().trim().max(64).nullable().optional(), interestedProgram: z.string().trim().max(180).nullable().optional(), source: z.string().trim().max(100).nullable().optional(), ownerUserId: z.number().int().positive().nullable().optional(), notes: z.string().trim().max(5000).nullable().optional() })).mutation(async ({ ctx, input }) => {
+      assertInstitutionAdmin(ctx.user);
+      return db.createProspect({ ...input, institutionId: ctx.institutionId ?? 1 });
+    }),
+    updateProspect: protectedProcedure.input(z.object({ id: z.number().int().positive(), data: z.object({ fullName: z.string().trim().min(2).max(180).optional(), email: z.string().trim().email().max(320).optional(), phone: z.string().trim().max(32).nullable().optional(), documentId: z.string().trim().max(64).nullable().optional(), interestedProgram: z.string().trim().max(180).nullable().optional(), source: z.string().trim().max(100).nullable().optional(), status: z.enum(["new", "contacted", "interested", "admitted", "enrolled", "lost"]).optional(), ownerUserId: z.number().int().positive().nullable().optional(), notes: z.string().trim().max(5000).nullable().optional() }) })).mutation(async ({ ctx, input }) => {
+      assertInstitutionAdmin(ctx.user);
+      const result = await db.updateProspect(input.id, ctx.institutionId ?? 1, input.data, ctx.user.id);
+      if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Prospecto no encontrado." });
+      return result;
+    }),
+    addActivity: protectedProcedure.input(z.object({ prospectId: z.number().int().positive(), activityType: z.enum(["call", "email", "meeting", "note"]), summary: z.string().trim().min(2).max(500) })).mutation(async ({ ctx, input }) => {
+      assertInstitutionAdmin(ctx.user);
+      const result = await db.addProspectActivity({ ...input, createdBy: ctx.user.id, institutionId: ctx.institutionId ?? 1 });
+      if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Prospecto no encontrado." });
+      return result;
+    }),
+    convertToStudent: protectedProcedure.input(z.object({ prospectId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      assertInstitutionAdmin(ctx.user);
+      const result = await db.convertProspectToStudent({ prospectId: input.prospectId, institutionId: ctx.institutionId ?? 1, actorId: ctx.user.id });
+      if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Prospecto no encontrado." });
+      return result;
+    }),
+  }),
+  admissions: router({
+    listApplications: protectedProcedure.query(async ({ ctx }) => {
+      assertInstitutionAdmin(ctx.user);
+      return db.listAdmissionApplications(ctx.institutionId ?? 1);
+    }),
+    createApplication: protectedProcedure.input(z.object({ prospectId: z.number().int().positive().nullable().optional(), programName: z.string().trim().min(2).max(180) })).mutation(async ({ ctx, input }) => {
+      const institutionId = ctx.institutionId ?? 1;
+      const result = await db.createAdmissionApplication({ ...input, institutionId, applicantUserId: ctx.user.id });
+      if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "El prospecto no pertenece a la institución activa." });
+      return result;
+    }),
+    updateApplication: protectedProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["draft", "submitted", "under_review", "approved", "rejected", "enrolled"]), reviewNotes: z.string().trim().max(5000).nullable().optional() })).mutation(async ({ ctx, input }) => {
+      assertInstitutionAdmin(ctx.user);
+      const result = await db.updateAdmissionApplication({ ...input, institutionId: ctx.institutionId ?? 1, reviewedBy: ctx.user.id });
+      if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitud de admisión no encontrada." });
+      return result;
+    }),
+    listDocuments: protectedProcedure.input(z.object({ applicationId: z.number().int().positive() })).query(async ({ ctx, input }) => {
+      const application = await db.getAdmissionApplication(input.applicationId, ctx.institutionId ?? 1);
+      if (!application) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitud de admisión no encontrada." });
+      if (ctx.user.role !== "admin" && application.applicantUserId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "No puedes consultar esta solicitud." });
+      return db.listAdmissionDocuments(input.applicationId, ctx.institutionId ?? 1);
+    }),
+    uploadDocument: protectedProcedure.input(z.object({ applicationId: z.number().int().positive(), documentType: z.string().trim().min(2).max(100), fileName: z.string().trim().min(1).max(255), mimeType: z.string().trim().min(3).max(120), base64: z.string().max(12_000_000) })).mutation(async ({ ctx, input }) => {
+      const application = await db.getAdmissionApplication(input.applicationId, ctx.institutionId ?? 1);
+      if (!application) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitud de admisión no encontrada." });
+      if (ctx.user.role !== "admin" && application.applicantUserId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "No puedes adjuntar documentos a esta solicitud." });
+      if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(input.mimeType)) throw new TRPCError({ code: "BAD_REQUEST", message: "Solo se aceptan PDF, JPG, PNG o WEBP." });
+      const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-120);
+      const uploaded = await storagePut(`institutions/${ctx.institutionId ?? 1}/admissions/${input.applicationId}/${Date.now()}-${safeName}`, Buffer.from(input.base64, "base64"), input.mimeType);
+      const result = await db.addAdmissionDocument({ institutionId: ctx.institutionId ?? 1, applicationId: input.applicationId, documentType: input.documentType, originalName: input.fileName, fileKey: uploaded.key, fileUrl: uploaded.url });
+      if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitud de admisión no encontrada." });
+      return result;
+    }),
+    reviewDocument: protectedProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["pending", "accepted", "rejected"]), rejectionReason: z.string().trim().max(1000).nullable().optional() })).mutation(async ({ ctx, input }) => {
+      assertInstitutionAdmin(ctx.user);
+      const result = await db.reviewAdmissionDocument({ ...input, institutionId: ctx.institutionId ?? 1, reviewedBy: ctx.user.id });
+      if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Documento no encontrado." });
+      return result;
+    }),
+    createPreEnrollment: protectedProcedure.input(z.object({ applicationId: z.number().int().positive(), period: z.string().trim().min(2).max(60) })).mutation(async ({ ctx, input }) => {
+      const application = await db.getAdmissionApplication(input.applicationId, ctx.institutionId ?? 1);
+      if (!application) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitud de admisión no encontrada." });
+      if (ctx.user.role !== "admin" && application.applicantUserId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "No puedes crear esta prematrícula." });
+      return db.createPreEnrollmentRequest({ ...input, institutionId: ctx.institutionId ?? 1 });
+    }),
+    listPreEnrollments: protectedProcedure.query(async ({ ctx }) => { assertInstitutionAdmin(ctx.user); return db.listPreEnrollmentRequests(ctx.institutionId ?? 1); }),
   }),
   notifications: router({
     list: protectedProcedure.query(({ ctx }) => db.listNotificationsForUser(ctx.user.id, ctx.institutionId ?? 1)),

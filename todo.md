@@ -327,3 +327,41 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 
 - [x] Hacer idempotente la creación de preferencias de notificación ante solicitudes concurrentes.
 - [x] Repetir la suite completa y confirmar que permisos y branding siguen pasando.
+
+## Plataforma institucional integral
+
+### Gestión comercial
+- [x] Crear prospectos con datos de contacto, programa de interés, origen, estado y responsable.
+- [ ] Permitir carga masiva de prospectos mediante Excel/CSV con validación por institución.
+- [x] Registrar actividades comerciales y convertir un prospecto en interesado, admitido o matriculado.
+
+### Admisiones y matrículas
+- [ ] Crear flujo de admisión y prematrícula con estados y revisión administrativa.
+- [ ] Permitir cargar documentos digitales usando almacenamiento seguro y metadatos en base de datos.
+- [ ] Permitir autogestión de prematrícula para prospectos y estudiantes autorizados.
+
+### Gestión académica ampliada
+- [ ] Añadir horarios por materia, grupo, docente, aula y período.
+- [ ] Añadir planes de estudio y relación con materias y competencias.
+- [ ] Generar certificados verificables con código QR y consulta pública segura.
+
+### Gestión financiera
+- [ ] Registrar conceptos de cobro, cartera, ingresos y egresos por institución.
+- [ ] Calcular estados de cuenta y mora sin mezclar instituciones.
+- [ ] Aplicar bloqueos automáticos de funciones académicas por mora según configuración institucional.
+
+### LMS
+- [ ] Organizar lecturas, videos, tareas y recursos por materia y módulo.
+- [ ] Sincronizar entregas y resultados del LMS con las notas del docente.
+- [ ] Mantener permisos diferenciados para docentes, estudiantes y administración.
+
+### Bienestar y egresados
+- [ ] Crear encuestas de satisfacción con respuestas aisladas por institución.
+- [ ] Automatizar invitaciones y recordatorios de encuestas mediante jobs compatibles con la plataforma.
+- [ ] Registrar seguimiento de egresados, contacto, situación laboral y actividades de vinculación.
+
+### Integración y calidad
+- [ ] Integrar navegación y dashboards por módulo y rol.
+- [ ] Añadir migraciones, helpers, procedimientos tRPC y pruebas por cada módulo.
+- [ ] Validar aislamiento multiinstitución, permisos, responsive y flujos críticos.
+- [ ] Publicar entregas modulares documentando lo implementado y lo pendiente.
