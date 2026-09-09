@@ -127,6 +127,13 @@
       "when": 1788748302196,
       "tag": "0017_productive_dragon_man",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1788967769544,
+      "tag": "0018_green_menace",
+      "breakpoints": true
     }
   ]
 }

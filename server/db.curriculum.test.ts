@@ -11,7 +11,9 @@ describe("createSubjectWithCurriculum", () => {
   it("inscribe de forma persistente a cada estudiante seleccionado", async () => {
     const students = await db.listStudents();
     expect(students.length).toBeGreaterThan(0);
-    const selectedStudentIds = students.slice(0, Math.min(2, students.length)).map(student => student.id);
+    const tenantStudents = students.filter(student => student.institutionId === 1);
+    expect(tenantStudents.length).toBeGreaterThan(0);
+    const selectedStudentIds = tenantStudents.slice(0, Math.min(2, tenantStudents.length)).map(student => student.id);
     const code = `IT-${Date.now().toString().slice(-8)}`;
 
     createdSubjectId = await db.createSubjectWithCurriculum({

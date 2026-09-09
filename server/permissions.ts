@@ -22,6 +22,10 @@ export function canManageExams(role: AcademicRole) {
   return normalised === "admin" || normalised === "teacher";
 }
 
+export function isAllowedExamRecordingMime(mimeType: string) {
+  return ["video/webm", "video/mp4", "audio/webm", "audio/mp4"].includes(mimeType);
+}
+
 export function canReviewExams(role: AcademicRole) {
   const normalised = normaliseAcademicRole(role);
   return normalised === "admin" || normalised === "teacher";

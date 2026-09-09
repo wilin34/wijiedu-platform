@@ -1642,3 +1642,11 @@ export async function triggerWellbeingNotifications(institutionId: number, trigg
   }
   return { surveys: surveys.length, notifications: created };
 }
+
+export async function updateExamAttemptRecording(input: { institutionId: number; attemptId: number; studentId: number; recordingKey: string; recordingMimeType: string; recordingConsentAt: Date }) {
+  const db = await requireDb();
+  const [attempt] = await db.select().from(examAttempts).where(and(eq(examAttempts.id, input.attemptId), eq(examAttempts.institutionId, input.institutionId), eq(examAttempts.studentId, input.studentId))).limit(1);
+  if (!attempt) return undefined;
+  await db.update(examAttempts).set({ recordingKey: input.recordingKey, recordingMimeType: input.recordingMimeType, recordingConsentAt: input.recordingConsentAt, recordingUploadedAt: new Date() }).where(and(eq(examAttempts.id, input.attemptId), eq(examAttempts.institutionId, input.institutionId), eq(examAttempts.studentId, input.studentId)));
+  return { attemptId: input.attemptId, recordingKey: input.recordingKey, recordingMimeType: input.recordingMimeType };
+}

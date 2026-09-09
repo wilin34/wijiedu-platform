@@ -378,3 +378,13 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Permitir al tutor revisar respuestas, asignar puntajes, comentarios y publicar la nota final.
 - [x] Sincronizar resultados del examen con las notas y el progreso académico del estudiante.
 - [x] Añadir pruebas de permisos, aislamiento institucional, privacidad de medios, calificación y experiencia responsive.
+
+## Mejora avanzada del sistema de exámenes
+
+- [x] Permitir configurar la generación IA por tema, cantidad total y tipos de preguntas seleccionados.
+- [x] Generar combinaciones de preguntas abiertas, cerradas, selección única, selección múltiple, falso/verdadero, completar, relacionar y ordenar.
+- [x] Permitir crear y editar varias preguntas manualmente en una misma evaluación antes de publicarla.
+- [x] Grabar cámara y micrófono durante el intento únicamente con consentimiento explícito y aviso de privacidad.
+- [x] Guardar las grabaciones en almacenamiento seguro con metadatos institucionales y del intento, sin almacenarlas en la base de datos.
+- [x] Permitir al docente autorizado revisar las grabaciones asociadas a sus propios exámenes y registrar una valoración.
+- [x] Probar aislamiento institucional, permisos docentes, consentimiento, retención y reproducción responsive de grabaciones.

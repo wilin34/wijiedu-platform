@@ -521,6 +521,10 @@ export const examAttempts = mysqlTable("exam_attempts", {
   manualScore: int("manualScore"),
   finalScore: int("finalScore"),
   tutorFeedback: text("tutorFeedback"),
+  recordingKey: varchar("recordingKey", { length: 512 }),
+  recordingMimeType: varchar("recordingMimeType", { length: 120 }),
+  recordingConsentAt: timestamp("recordingConsentAt"),
+  recordingUploadedAt: timestamp("recordingUploadedAt"),
 });
 
 export const examAnswers = mysqlTable("exam_answers", {
