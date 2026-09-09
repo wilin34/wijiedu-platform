@@ -409,3 +409,13 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Sincronizar la calificación automática objetiva con las notas académicas.
 - [x] Mantener respuestas abiertas y mixtas en revisión docente.
 - [x] Añadir pruebas de cámara/micrófono, habilitación de formularios y calificación automática.
+
+## Mejora de revisión y notas de exámenes
+
+- [x] Permitir abrir cualquier intento presentado desde Revisar, incluidos exámenes objetivos ya calificados.
+- [x] Mostrar respuestas, opciones, puntuación automática y estado de calificación del intento.
+- [x] Mostrar grabación audiovisual autorizada en la revisión cuando esté disponible.
+- [x] Hacer visible el acceso a Notas para administración y docentes según permisos.
+- [x] Incorporar la nota del examen al perfil académico del estudiante y al listado de notas.
+- [x] Mantener la revisión manual para preguntas abiertas o exámenes mixtos.
+- [x] Añadir pruebas de intentos calificados, reproducción autorizada y sincronización de notas.
