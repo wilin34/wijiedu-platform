@@ -1484,7 +1484,8 @@ export async function submitExamAttempt(input: { attemptId: number; institutionI
   if (values.length) await db.insert(examAnswers).values(values);
   const hasOpen = questions.some(question => question.questionType === "open");
   await db.update(examAttempts).set({ status: hasOpen ? "under_review" : "graded", submittedAt: new Date(), autoScore, finalScore: hasOpen ? null : autoScore }).where(eq(examAttempts.id, input.attemptId));
-  return { attemptId: input.attemptId, autoScore, requiresTutorReview: hasOpen };
+  const maxScore = questions.reduce((total, question) => total + question.points, 0);
+  return { attemptId: input.attemptId, examId: attempt.examId, studentId: input.studentId, autoScore, maxScore, requiresTutorReview: hasOpen };
 }
 
 export async function addExamProctoringEvent(input: { attemptId: number; institutionId: number; studentId: number; eventType: "camera_granted" | "camera_revoked" | "microphone_granted" | "microphone_revoked" | "fullscreen_entered" | "fullscreen_exited" | "tab_hidden" | "tab_visible" | "technical_error" }) {

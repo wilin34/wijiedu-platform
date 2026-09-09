@@ -399,3 +399,13 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Crear opciones A, B, C y D en preguntas manuales de selección y exigir una correcta y tres distractores.
 - [x] Hacer que la IA genere opciones A-D, una correcta y tres distractores en preguntas de selección.
 - [x] Añadir pruebas de visibilidad compartida, calificación bilateral, opciones A-D y aislamiento por institución.
+
+## Correcciones de exámenes reportadas
+
+- [x] Reconocer correctamente permisos de cámara y micrófono después de concederlos en escritorio y móvil.
+- [x] Habilitar los botones de crear examen manual y generar propuesta con IA cuando el formulario sea válido.
+- [x] Permitir asignar puntos a cada pregunta y mostrar el total del examen.
+- [x] Calificar automáticamente por puntos los exámenes compuestos solo por preguntas objetivas.
+- [x] Sincronizar la calificación automática objetiva con las notas académicas.
+- [x] Mantener respuestas abiertas y mixtas en revisión docente.
+- [x] Añadir pruebas de cámara/micrófono, habilitación de formularios y calificación automática.
