@@ -22,6 +22,10 @@ export function canManageExams(role: AcademicRole) {
   return normalised === "admin" || normalised === "teacher";
 }
 
+export function hasValidExamChoiceOptions(options: unknown, correctAnswer: unknown) {
+  return Array.isArray(options) && options.length === 4 && new Set(options.map(String)).size === 4 && typeof correctAnswer === "string" && options.map(String).includes(correctAnswer);
+}
+
 export function isAllowedExamRecordingMime(mimeType: string) {
   return ["video/webm", "video/mp4", "audio/webm", "audio/mp4"].includes(mimeType);
 }

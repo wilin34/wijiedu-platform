@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canReviewExams, isAllowedExamRecordingMime } from "./permissions";
+import { canReviewExams, hasValidExamChoiceOptions, isAllowedExamRecordingMime } from "./permissions";
 
 describe("grabaciones de exámenes", () => {
   it("acepta únicamente formatos audiovisuales permitidos", () => {
@@ -7,6 +7,14 @@ describe("grabaciones de exámenes", () => {
     expect(isAllowedExamRecordingMime("video/mp4")).toBe(true);
     expect(isAllowedExamRecordingMime("application/pdf")).toBe(false);
     expect(isAllowedExamRecordingMime("text/plain")).toBe(false);
+  });
+
+  it("exige cuatro opciones distintas y una respuesta correcta", () => {
+    const options = ["A. Primera", "B. Segunda", "C. Tercera", "D. Cuarta"];
+    expect(hasValidExamChoiceOptions(options, options[0])).toBe(true);
+    expect(hasValidExamChoiceOptions(options.slice(0, 3), options[0])).toBe(false);
+    expect(hasValidExamChoiceOptions(["A", "A", "C", "D"], "A")).toBe(false);
+    expect(hasValidExamChoiceOptions(options, "E. Otra")).toBe(false);
   });
 
   it("mantiene la revisión restringida a administración y docentes", () => {

@@ -388,3 +388,14 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Guardar las grabaciones en almacenamiento seguro con metadatos institucionales y del intento, sin almacenarlas en la base de datos.
 - [x] Permitir al docente autorizado revisar las grabaciones asociadas a sus propios exámenes y registrar una valoración.
 - [x] Probar aislamiento institucional, permisos docentes, consentimiento, retención y reproducción responsive de grabaciones.
+
+## Ajustes de exámenes compartidos
+
+- [x] Permitir que administradores y docentes creen exámenes y vean los exámenes creados por el otro dentro de la institución.
+- [x] Mantener la publicación y visibilidad del examen limitada a estudiantes inscritos en la materia correspondiente.
+- [x] Permitir que administradores y docentes revisen todos los intentos de la institución según sus permisos académicos.
+- [x] Mostrar en la revisión las respuestas, opciones, puntajes, correcciones y retroalimentación por pregunta.
+- [x] Mostrar al administrador y al docente autorizados la grabación audiovisual almacenada del intento.
+- [x] Crear opciones A, B, C y D en preguntas manuales de selección y exigir una correcta y tres distractores.
+- [x] Hacer que la IA genere opciones A-D, una correcta y tres distractores en preguntas de selección.
+- [x] Añadir pruebas de visibilidad compartida, calificación bilateral, opciones A-D y aislamiento por institución.
