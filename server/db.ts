@@ -1498,7 +1498,7 @@ export async function addExamProctoringEvent(input: { attemptId: number; institu
 
 export async function listExamAttemptsForTeacher(examId: number, institutionId: number) {
   const db = await requireDb();
-  return db.select({ attempt: examAttempts, studentName: students.fullName }).from(examAttempts).innerJoin(students, and(eq(students.id, examAttempts.studentId), eq(students.institutionId, institutionId))).where(and(eq(examAttempts.examId, examId), eq(examAttempts.institutionId, institutionId))).orderBy(desc(examAttempts.startedAt));
+  return db.select({ attempt: examAttempts, studentName: students.fullName }).from(examAttempts).leftJoin(students, and(eq(students.id, examAttempts.studentId), eq(students.institutionId, institutionId))).where(and(eq(examAttempts.examId, examId), eq(examAttempts.institutionId, institutionId))).orderBy(desc(examAttempts.startedAt));
 }
 
 export async function getExamAttemptForTeacher(attemptId: number, institutionId: number) {

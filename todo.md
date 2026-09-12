@@ -361,10 +361,10 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Registrar seguimiento de egresados, contacto, situación laboral y actividades de vinculación.
 
 ### Integración y calidad
-- [ ] Integrar navegación y dashboards por módulo y rol.
-- [ ] Añadir migraciones, helpers, procedimientos tRPC y pruebas por cada módulo.
-- [ ] Validar aislamiento multiinstitución, permisos, responsive y flujos críticos.
-- [ ] Publicar entregas modulares documentando lo implementado y lo pendiente.
+- [x] Integrar navegación y dashboards por módulo y rol.
+- [x] Añadir migraciones, helpers, procedimientos tRPC y pruebas por cada módulo.
+- [x] Validar aislamiento multiinstitución, permisos, responsive y flujos críticos.
+- [x] Publicar entregas modulares documentando lo implementado y lo pendiente.
 
 ## Sistema integral de exámenes
 
@@ -419,3 +419,10 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Incorporar la nota del examen al perfil académico del estudiante y al listado de notas.
 - [x] Mantener la revisión manual para preguntas abiertas o exámenes mixtos.
 - [x] Añadir pruebas de intentos calificados, reproducción autorizada y sincronización de notas.
+
+## Corrección de acceso administrativo a Revisar
+
+- [x] Permitir que el administrador abra Revisar desde cualquier examen con intentos presentados de su institución.
+- [x] Mostrar un mensaje diagnóstico si no hay intentos, si el intento no pertenece a la institución o si falla la autorización.
+- [x] Validar respuestas, nota automática y grabación desde la sesión administrativa.
+- [x] Añadir pruebas de acceso administrativo a revisión de intentos y aislamiento institucional.
