@@ -426,3 +426,9 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Mostrar un mensaje diagnóstico si no hay intentos, si el intento no pertenece a la institución o si falla la autorización.
 - [x] Validar respuestas, nota automática y grabación desde la sesión administrativa.
 - [x] Añadir pruebas de acceso administrativo a revisión de intentos y aislamiento institucional.
+
+## Persistencia visual de respuestas en exámenes
+
+- [x] Mantener marcada la opción elegida al cambiar de pregunta y regresar a ella.
+- [x] Mostrar indicadores consistentes para selección única, múltiple y verdadero/falso.
+- [x] Validar que las respuestas persistentes se envíen correctamente al finalizar el examen.
