@@ -3404,6 +3404,14 @@ type ExamQuestionInput = {
   sortOrder: number;
 };
 
+export function isExamAttemptExpired(
+  startedAt: Date,
+  durationMinutes: number,
+  now = new Date()
+) {
+  return now.getTime() > startedAt.getTime() + durationMinutes * 60_000;
+}
+
 export function validateExamAvailabilityWindow(
   availableFrom?: Date | null,
   availableUntil?: Date | null
@@ -3703,6 +3711,28 @@ export async function submitExamAttempt(input: {
     )
     .limit(1);
   if (!attempt) return undefined;
+  const [exam] = await db
+    .select({ durationMinutes: exams.durationMinutes })
+    .from(exams)
+    .where(
+      and(
+        eq(exams.id, attempt.examId),
+        eq(exams.institutionId, input.institutionId)
+      )
+    )
+    .limit(1);
+  if (!exam || isExamAttemptExpired(attempt.startedAt, exam.durationMinutes)) {
+    await db
+      .update(examAttempts)
+      .set({ status: "cancelled", submittedAt: new Date() })
+      .where(
+        and(
+          eq(examAttempts.id, input.attemptId),
+          eq(examAttempts.institutionId, input.institutionId)
+        )
+      );
+    throw new Error("El tiempo máximo del examen ya terminó.");
+  }
   const questions = await db
     .select()
     .from(examQuestions)

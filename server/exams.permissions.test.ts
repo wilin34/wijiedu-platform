@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canManageExams, canReviewExams } from "./permissions";
-import { validateExamAvailabilityWindow } from "./db";
+import { isExamAttemptExpired, validateExamAvailabilityWindow } from "./db";
 
 describe("permisos de exámenes", () => {
   it("permite crear exámenes a administración y docentes", () => {
@@ -15,6 +15,16 @@ describe("permisos de exámenes", () => {
     expect(canReviewExams("teacher")).toBe(true);
     expect(canReviewExams("student")).toBe(false);
     expect(canReviewExams("user")).toBe(false);
+  });
+
+  it("rechaza envíos posteriores a la duración máxima del intento", () => {
+    const startedAt = new Date("2026-09-20T14:00:00.000Z");
+    expect(
+      isExamAttemptExpired(startedAt, 60, new Date("2026-09-20T14:59:59.000Z"))
+    ).toBe(false);
+    expect(
+      isExamAttemptExpired(startedAt, 60, new Date("2026-09-20T15:00:01.000Z"))
+    ).toBe(true);
   });
 
   it("rechaza una ventana de disponibilidad invertida y acepta una válida", () => {
