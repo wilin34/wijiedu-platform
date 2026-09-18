@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { canManageExams, canReviewExams } from "./permissions";
+import {
+  canManageExams,
+  canReviewExams,
+  hasValidExamChoiceOptions,
+} from "./permissions";
 import { distributeExamQuestionTypes } from "./routers";
-import { isExamAttemptExpired, validateExamAvailabilityWindow } from "./db";
+import {
+  isExamAttemptExpired,
+  normalizedExamAnswer,
+  validateExamAvailabilityWindow,
+} from "./db";
 
 describe("permisos de exámenes", () => {
   it("permite crear exámenes a administración y docentes", () => {
@@ -28,6 +36,15 @@ describe("permisos de exámenes", () => {
     expect(
       distributeExamQuestionTypes(3, ["open", "multiple_choice", "ordering"])
     ).toEqual(["open", "multiple_choice", "ordering"]);
+  });
+
+  it("califica correctamente selección múltiple y valida respuestas A-D", () => {
+    const options = ["A", "B", "C", "D"];
+    expect(hasValidExamChoiceOptions(options, ["A", "C"])).toBe(true);
+    expect(hasValidExamChoiceOptions(options, ["A", "E"])).toBe(false);
+    expect(normalizedExamAnswer("multiple_choice", "C||A")).toBe(
+      normalizedExamAnswer("multiple_choice", ["A", "C"])
+    );
   });
 
   it("permite revisar intentos a administración y docentes, nunca al estudiante", () => {

@@ -1,6 +1,8 @@
 export type AcademicRole = "admin" | "teacher" | "student" | "user";
 
-export function normaliseAcademicRole(role: AcademicRole): "admin" | "teacher" | "student" {
+export function normaliseAcademicRole(
+  role: AcademicRole
+): "admin" | "teacher" | "student" {
   return role === "user" ? "student" : role;
 }
 
@@ -22,12 +24,28 @@ export function canManageExams(role: AcademicRole) {
   return normalised === "admin" || normalised === "teacher";
 }
 
-export function hasValidExamChoiceOptions(options: unknown, correctAnswer: unknown) {
-  return Array.isArray(options) && options.length === 4 && new Set(options.map(String)).size === 4 && typeof correctAnswer === "string" && options.map(String).includes(correctAnswer);
+export function hasValidExamChoiceOptions(
+  options: unknown,
+  correctAnswer: unknown
+) {
+  if (!Array.isArray(options) || options.length !== 4) return false;
+  const normalizedOptions = options.map(String);
+  if (new Set(normalizedOptions).size !== 4) return false;
+  if (typeof correctAnswer === "string")
+    return normalizedOptions.includes(correctAnswer);
+  return (
+    Array.isArray(correctAnswer) &&
+    correctAnswer.length > 0 &&
+    correctAnswer.every(
+      item => typeof item === "string" && normalizedOptions.includes(item)
+    )
+  );
 }
 
 export function isAllowedExamRecordingMime(mimeType: string) {
-  return ["video/webm", "video/mp4", "audio/webm", "audio/mp4"].includes(mimeType);
+  return ["video/webm", "video/mp4", "audio/webm", "audio/mp4"].includes(
+    mimeType
+  );
 }
 
 export function canReviewExams(role: AcademicRole) {

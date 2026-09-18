@@ -3687,7 +3687,15 @@ export async function startExamAttempt(input: {
   };
 }
 
-function normalizedAnswer(value: unknown) {
+export function normalizedExamAnswer(questionType: string, value: unknown) {
+  if (questionType === "multiple_choice") {
+    const values = Array.isArray(value)
+      ? value.map(String)
+      : typeof value === "string"
+        ? value.split("||").filter(Boolean)
+        : [String(value)];
+    return JSON.stringify(values.map(item => item.trim().toLowerCase()).sort());
+  }
   return JSON.stringify(value).trim().toLowerCase();
 }
 
@@ -3749,8 +3757,11 @@ export async function submitExamAttempt(input: {
     const isCorrect =
       objective &&
       question.correctAnswer != null &&
-      normalizedAnswer(answer.answer) ===
-        normalizedAnswer(JSON.parse(question.correctAnswer));
+      normalizedExamAnswer(question.questionType, answer.answer) ===
+        normalizedExamAnswer(
+          question.questionType,
+          JSON.parse(question.correctAnswer)
+        );
     const score = isCorrect ? question.points : 0;
     if (objective) autoScore += score;
     return {

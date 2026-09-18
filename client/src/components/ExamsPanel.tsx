@@ -760,27 +760,94 @@ export default function ExamsPanel({
                             }
                           />
                         ))}
-                        <select
-                          className="wij-input"
-                          value={question.correctAnswer}
-                          onChange={e =>
-                            setManualQuestions(current =>
-                              current.map((item, itemIndex) =>
-                                itemIndex === index
-                                  ? { ...item, correctAnswer: e.target.value }
-                                  : item
+                        {question.questionType === "multiple_choice" ? (
+                          <div className="grid gap-2 rounded-xl border border-[#3A4556] p-3 text-xs text-[#DDE5EE]">
+                            <p className="font-semibold text-[#D8BF86]">
+                              Selecciona una o varias respuestas correctas
+                            </p>
+                            {question.options.filter(Boolean).map(option => {
+                              const selected = question.correctAnswer
+                                .split("||")
+                                .includes(option);
+                              return (
+                                <label
+                                  key={option}
+                                  className="flex items-center gap-2"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    onChange={event =>
+                                      setManualQuestions(current =>
+                                        current.map((item, itemIndex) => {
+                                          if (itemIndex !== index) return item;
+                                          const values = item.correctAnswer
+                                            .split("||")
+                                            .filter(Boolean);
+                                          const next = event.target.checked
+                                            ? [...values, option]
+                                            : values.filter(
+                                                value => value !== option
+                                              );
+                                          return {
+                                            ...item,
+                                            correctAnswer: next.join("||"),
+                                          };
+                                        })
+                                      )
+                                    }
+                                  />
+                                  {option}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <select
+                            className="wij-input"
+                            value={question.correctAnswer}
+                            onChange={e =>
+                              setManualQuestions(current =>
+                                current.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? { ...item, correctAnswer: e.target.value }
+                                    : item
+                                )
                               )
-                            )
-                          }
-                        >
-                          <option value="">Selecciona la correcta</option>
-                          {question.options.filter(Boolean).map(option => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
+                            }
+                          >
+                            <option value="">Selecciona la correcta</option>
+                            {question.options.filter(Boolean).map(option => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
+                    )}
+                    {question.questionType === "true_false" && (
+                      <select
+                        className="wij-input mt-2"
+                        value={question.correctAnswer}
+                        onChange={e =>
+                          setManualQuestions(current =>
+                            current.map((item, itemIndex) =>
+                              itemIndex === index
+                                ? {
+                                    ...item,
+                                    correctAnswer: e.target.value,
+                                    options: ["Verdadero", "Falso"],
+                                  }
+                                : item
+                            )
+                          )
+                        }
+                      >
+                        <option value="">Respuesta correcta: selecciona</option>
+                        <option value="Verdadero">Verdadero</option>
+                        <option value="Falso">Falso</option>
+                      </select>
                     )}
                     <input
                       className="wij-input mt-2"
@@ -800,7 +867,8 @@ export default function ExamsPanel({
                       }
                     />
                     {question.questionType !== "single_choice" &&
-                      question.questionType !== "multiple_choice" && (
+                      question.questionType !== "multiple_choice" &&
+                      question.questionType !== "true_false" && (
                         <input
                           className="wij-input mt-2"
                           placeholder="Respuesta correcta o clave (opcional)"
@@ -886,8 +954,13 @@ export default function ExamsPanel({
                         question.questionType === "single_choice" ||
                         question.questionType === "multiple_choice"
                           ? question.options
-                          : null,
-                      correctAnswer: question.correctAnswer || null,
+                          : question.questionType === "true_false"
+                            ? ["Verdadero", "Falso"]
+                            : null,
+                      correctAnswer:
+                        question.questionType === "multiple_choice"
+                          ? question.correctAnswer.split("||").filter(Boolean)
+                          : question.correctAnswer || null,
                       rubric:
                         question.questionType === "open"
                           ? "Evaluar claridad, argumentos y aplicación."
