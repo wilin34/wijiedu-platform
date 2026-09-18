@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canManageExams, canReviewExams } from "./permissions";
+import { distributeExamQuestionTypes } from "./routers";
 import { isExamAttemptExpired, validateExamAvailabilityWindow } from "./db";
 
 describe("permisos de exámenes", () => {
@@ -8,6 +9,25 @@ describe("permisos de exámenes", () => {
     expect(canManageExams("teacher")).toBe(true);
     expect(canManageExams("student")).toBe(false);
     expect(canManageExams("user")).toBe(false);
+  });
+
+  it("distribuye exactamente los tipos elegidos sin convertirlos a opción múltiple", () => {
+    expect(distributeExamQuestionTypes(4, ["true_false"])).toEqual([
+      "true_false",
+      "true_false",
+      "true_false",
+      "true_false",
+    ]);
+    expect(distributeExamQuestionTypes(5, ["true_false", "open"])).toEqual([
+      "true_false",
+      "open",
+      "true_false",
+      "open",
+      "true_false",
+    ]);
+    expect(
+      distributeExamQuestionTypes(3, ["open", "multiple_choice", "ordering"])
+    ).toEqual(["open", "multiple_choice", "ordering"]);
   });
 
   it("permite revisar intentos a administración y docentes, nunca al estudiante", () => {

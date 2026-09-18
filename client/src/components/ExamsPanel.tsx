@@ -938,6 +938,11 @@ export default function ExamsPanel({
                 <option value="intermediate">Intermedia</option>
                 <option value="advanced">Avanzada</option>
               </select>
+              <p className="rounded-xl border border-[#B69A5E]/30 bg-[#B69A5E]/10 px-3 py-2 text-xs text-[#E6D6AB]">
+                La IA respetará únicamente los tipos seleccionados y los
+                distribuirá en orden. Ejemplo: 5 preguntas con Verdadero/Falso +
+                Abiertas = 3 y 2.
+              </p>
               <div className="grid grid-cols-2 gap-2 text-xs text-[#DDE5EE]">
                 {Object.entries(labels).map(([value, label]) => (
                   <label

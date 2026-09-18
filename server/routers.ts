@@ -56,6 +56,39 @@ function assertInstitutionAdmin(user: { role?: string }) {
     });
 }
 
+export function distributeExamQuestionTypes(
+  questionCount: number,
+  questionTypes: string[]
+) {
+  if (questionCount < 1 || questionTypes.length < 1) return [];
+  return Array.from(
+    { length: questionCount },
+    (_, index) => questionTypes[index % questionTypes.length]
+  );
+}
+
+function validateGeneratedExamQuestionSet(
+  questions: Array<{ questionType: string }>,
+  expectedTypes: string[]
+) {
+  if (questions.length !== expectedTypes.length) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message:
+        "La IA no respetó la cantidad de preguntas solicitada. Intenta generar nuevamente.",
+    });
+  }
+  const actual = questions.map(question => question.questionType);
+  const matches = actual.every((type, index) => type === expectedTypes[index]);
+  if (!matches) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message:
+        "La IA no respetó los tipos de pregunta seleccionados. Intenta generar nuevamente.",
+    });
+  }
+}
+
 function validateExamQuestionSet(
   questions: Array<{
     questionType: string;
@@ -907,16 +940,20 @@ export const appRouter = router({
           input.subjectId,
           ctx.institutionId ?? 1
         );
+        const expectedQuestionTypes = distributeExamQuestionTypes(
+          input.questionCount,
+          input.questionTypes
+        );
+        const typePlan = expectedQuestionTypes.join(", ");
         const response = await invokeLLM({
           messages: [
             {
               role: "system",
-              content:
-                "Genera exámenes educativos rigurosos. Devuelve únicamente JSON válido y crea preguntas claras, variadas y calificables.",
+              content: `Genera exámenes educativos rigurosos. Devuelve únicamente JSON válido. Debes crear exactamente ${input.questionCount} preguntas y respetar exactamente, en este orden, este plan de tipos: ${typePlan}. Nunca sustituyas un tipo seleccionado por selección única ni agregues preguntas de otro tipo.`,
             },
             {
               role: "user",
-              content: `Materia: ${input.subjectId}. Tema: ${input.topic}. Dificultad: ${input.difficulty}. Cantidad: ${input.questionCount}. Tipos permitidos: ${input.questionTypes.join(", ")}. Las preguntas abiertas deben incluir rúbrica y no deben tener respuesta correcta automática. Para single_choice y multiple_choice debes devolver exactamente cuatro opciones rotulables A, B, C y D, tres distractores y una respuesta correcta; correctAnswer debe coincidir con una opción o con un arreglo de opciones.`,
+              content: `Materia: ${input.subjectId}. Tema: ${input.topic}. Dificultad: ${input.difficulty}. Cantidad exacta: ${input.questionCount}. Plan exacto de tipos por posición: ${typePlan}. Si hay dos tipos y cinco preguntas, distribúyelas 3 y 2 en el orden indicado; si solo se selecciona verdadero/falso, todas deben ser verdadero/falso. Las preguntas abiertas deben incluir rúbrica y no tener respuesta correcta automática. Las preguntas true_false deben tener opciones ["Verdadero", "Falso"] y correctAnswer debe ser una de ellas. Para single_choice y multiple_choice devuelve exactamente cuatro opciones A, B, C y D, tres distractores y una respuesta correcta; correctAnswer debe coincidir con una opción o con un arreglo de opciones. Para fill_blank, matching y ordering devuelve una respuesta correcta estructurada y coherente con el tipo.`,
             },
           ],
           response_format: {
@@ -931,6 +968,8 @@ export const appRouter = router({
                   instructions: { type: "string" },
                   questions: {
                     type: "array",
+                    minItems: input.questionCount,
+                    maxItems: input.questionCount,
                     items: {
                       type: "object",
                       properties: {
@@ -942,8 +981,6 @@ export const appRouter = router({
                         options: {
                           type: ["array", "null"],
                           items: { type: "string" },
-                          minItems: 4,
-                          maxItems: 4,
                         },
                         correctAnswer: {},
                         rubric: { type: ["string", "null"] },
@@ -975,6 +1012,10 @@ export const appRouter = router({
           });
         try {
           const proposal = JSON.parse(content);
+          validateGeneratedExamQuestionSet(
+            proposal.questions ?? [],
+            expectedQuestionTypes
+          );
           validateExamQuestionSet(proposal.questions ?? []);
           return proposal;
         } catch (error) {
