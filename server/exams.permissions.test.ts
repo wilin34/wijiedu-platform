@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canManageExams, canReviewExams } from "./permissions";
+import { validateExamAvailabilityWindow } from "./db";
 
 describe("permisos de exámenes", () => {
   it("permite crear exámenes a administración y docentes", () => {
@@ -14,5 +15,15 @@ describe("permisos de exámenes", () => {
     expect(canReviewExams("teacher")).toBe(true);
     expect(canReviewExams("student")).toBe(false);
     expect(canReviewExams("user")).toBe(false);
+  });
+
+  it("rechaza una ventana de disponibilidad invertida y acepta una válida", () => {
+    const start = new Date("2026-09-20T14:00:00.000Z");
+    const end = new Date("2026-09-20T15:00:00.000Z");
+    expect(() => validateExamAvailabilityWindow(start, end)).not.toThrow();
+    expect(() => validateExamAvailabilityWindow(end, start)).toThrow(
+      "posterior"
+    );
+    expect(() => validateExamAvailabilityWindow(start, null)).not.toThrow();
   });
 });

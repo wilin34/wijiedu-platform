@@ -134,6 +134,13 @@
       "when": 1788967769544,
       "tag": "0018_green_menace",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1789511745531,
+      "tag": "0019_chilly_jack_flag",
+      "breakpoints": true
     }
   ]
 }

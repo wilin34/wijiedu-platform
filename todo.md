@@ -432,3 +432,12 @@ No incluir contraseñas, hashes ni tokens de recuperación en mensajes al usuari
 - [x] Mantener marcada la opción elegida al cambiar de pregunta y regresar a ella.
 - [x] Mostrar indicadores consistentes para selección única, múltiple y verdadero/falso.
 - [x] Validar que las respuestas persistentes se envíen correctamente al finalizar el examen.
+
+## Programación y eliminación de exámenes
+
+- [ ] Añadir fecha y hora de activación y desactivación de cada examen.
+- [ ] Validar en servidor que el estudiante solo pueda iniciar el examen dentro de la ventana configurada.
+- [ ] Mantener y validar la duración máxima del intento desde el inicio del examen.
+- [ ] Permitir eliminar exámenes con permisos administrativos/docentes y aislamiento institucional.
+- [ ] Proteger o limpiar de forma segura preguntas, intentos, respuestas y grabaciones relacionadas al eliminar un examen.
+- [ ] Añadir pruebas y validación visual del flujo de programación y eliminación.

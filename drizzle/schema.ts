@@ -482,6 +482,8 @@ export const exams = mysqlTable("exams", {
   description: text("description"),
   instructions: text("instructions"),
   durationMinutes: int("durationMinutes").default(60).notNull(),
+  availableFrom: timestamp("availableFrom"),
+  availableUntil: timestamp("availableUntil"),
   maxAttempts: int("maxAttempts").default(1).notNull(),
   requiresCamera: int("requiresCamera").default(1).notNull(),
   requiresMicrophone: int("requiresMicrophone").default(1).notNull(),
