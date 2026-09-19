@@ -3600,7 +3600,32 @@ export async function getExamWithQuestions(
   return {
     exam,
     questions: studentId
-      ? questions.map(question => ({ ...question, correctAnswer: null }))
+      ? questions.map(question => {
+          if (
+            (question.questionType === "single_choice" ||
+              question.questionType === "multiple_choice") &&
+            question.options
+          ) {
+            try {
+              const options = JSON.parse(question.options) as unknown[];
+              for (let index = options.length - 1; index > 0; index -= 1) {
+                const swapIndex = Math.floor(Math.random() * (index + 1));
+                [options[index], options[swapIndex]] = [
+                  options[swapIndex],
+                  options[index],
+                ];
+              }
+              return {
+                ...question,
+                options: JSON.stringify(options),
+                correctAnswer: null,
+              };
+            } catch {
+              return { ...question, correctAnswer: null };
+            }
+          }
+          return { ...question, correctAnswer: null };
+        })
       : questions,
   };
 }
